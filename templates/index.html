@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1220">
-    <title>HydroAlert | Ciudad del Carmen</title>
+    <title>OlaRuta | Monitoreo de Inundaciones - Ciudad del Carmen</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       rel="stylesheet"
@@ -22,12 +22,12 @@
     </style>
   </head>
   <body class="min-h-screen text-slate-800 antialiased">
-    <header class="border-b border-slate-200 bg-white">
+    <header class="border-b border-slate-200 bg-white shadow-sm">
       <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6">
-        <a class="flex items-center gap-3" href="/" aria-label="HydroAlert, inicio">
-          <span class="grid h-10 w-10 place-items-center rounded-xl bg-cyan-600 text-xl text-white" aria-hidden="true">⌁</span>
+        <a class="flex items-center gap-3" href="/" aria-label="OlaRuta, inicio">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-cyan-600 text-xl text-white shadow-sm" aria-hidden="true">🌊</span>
           <span>
-            <span class="block text-lg font-bold tracking-tight text-slate-900">HydroAlert</span>
+            <span class="block text-lg font-bold tracking-tight text-slate-900">OlaRuta</span>
             <span class="block text-xs text-slate-500">Ciudad del Carmen, Campeche</span>
           </span>
         </a>
@@ -192,7 +192,7 @@
         if (!contentType.toLowerCase().includes("json")) {
           if (response.status === 404) {
             throw new Error(
-              "La ruta de la API devolvió 404. Abre HydroAlert desde Flask en " +
+              "La ruta de la API devolvió 404. Abre OlaRuta desde Flask en " +
               "http://127.0.0.1:5000 (no con Live Server) y vuelve a cargar la página."
             );
           }

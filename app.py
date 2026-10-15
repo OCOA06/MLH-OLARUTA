@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -30,7 +31,7 @@ REPORTS_LOCK = threading.Lock()
 # Riesgo base: 1 = bajo, 2 = moderado, 3 = alto.
 RISK_ZONES = [
     {
-        "name": "Centro",
+        "name": "Centro Histórico",
         "latitude": 18.6388,
         "longitude": -91.8367,
         "base_risk": 2,
@@ -45,6 +46,36 @@ RISK_ZONES = [
         "name": "Colonia 23 de Julio",
         "latitude": 18.6652,
         "longitude": -91.8195,
+        "base_risk": 2,
+    },
+    {
+        "name": "Colonia La Manigua",
+        "latitude": 18.6325,
+        "longitude": -91.8322,
+        "base_risk": 3,
+    },
+    {
+        "name": "Colonia El Caracol",
+        "latitude": 18.6438,
+        "longitude": -91.8290,
+        "base_risk": 3,
+    },
+    {
+        "name": "Playón / Arroyo de los Franceses",
+        "latitude": 18.6410,
+        "longitude": -91.8155,
+        "base_risk": 3,
+    },
+    {
+        "name": "La Caleta / Boquerón del Palmar",
+        "latitude": 18.6535,
+        "longitude": -91.8360,
+        "base_risk": 2,
+    },
+    {
+        "name": "Colonia Tierra y Libertad",
+        "latitude": 18.6360,
+        "longitude": -91.8080,
         "base_risk": 2,
     },
     {
@@ -206,4 +237,7 @@ def api_reports():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    print(f"=== INICIANDO OLARUTA - CIUDAD DEL CARMEN ===")
+    print(f"Servidor activo en: http://127.0.0.1:{port}")
+    app.run(host="0.0.0.0", port=port, debug=True)
