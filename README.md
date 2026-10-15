@@ -68,7 +68,13 @@ Abre tu navegador en:
 ---
 
 ## 👥 Equipo OlaRuta
-Desarrollado para el Hackathon **MLH OLARUTA**.
+Desarrollado con ❤️ para el Hackathon **MLH OLARUTA**:
+
+- **Jossie Arianna Peraza Castro**
+- **Sara Victoria Rojas Gonzalez**
+- **Roger de Jesus Sanchez Peñate**
+- **Ángel Jaret Pérez Rodríguez**
+- **Miguel Ángel Guerrero Damas**
 
 ---
 
