@@ -14,15 +14,17 @@ Ante episodios de precipitación continua combinados con marea alta (pleamar) o 
 
 ## 🏛️ 2. Arquitectura de la Aplicación
 
-- **Frontend Moderno y Reactivo**:
-  - HTML5 semántico + Tailwind CSS (diseño responsivo adaptado para móviles y computadoras).
-  - **Leaflet.js + OpenStreetMap**: Visualización cartográfica interactiva sin requerir API keys de pago.
-  - **Marcadores dinámicos duales**:
-    - **Semáforo de Colonias**: Marcadores de zonas de riesgo calculados en tiempo real (*Verde, Amarillo, Rojo*).
-    - **Pines Ciudadanos**: Marcadores interactivos para reportes comunitarios según categoría:
-      - 🔴 **Inundación / Anegamiento**
-      - 🔵 **Construcción / Remodelación**
-      - 🟠 **Accidente / Obstrucción vial**
+- **Frontend Moderno y Fiel a los Diseños Oficiales (Mockups OlaRuta)**:
+  - Interfaz visual basada en la identidad oficial: navbar navy (`#07162c`), icono circular glowing `icon.png` y logo oficial `logo.png`.
+  - Favicon oficial integrado para pestañas de navegador.
+  - **Pantalla 1: Reporte Ciudadano** ("¿Qué está pasando en tu ubicación?") con tarjetas interactivas de categoría con sus respectivos recursos:
+    - 💥 **Accidente** (`accidente.png`)
+    - 🌊 **Inundación** (`inundaciones.png`)
+    - 🚧 **Cierre / Bloqueo** (`bloqueos.png`)
+    - Botones píldora oficiales: **Reportar**, **Predicciones** y **Regresar**.
+  - **Pantalla 2: Modal de Predicción** ("HORA", "A DONDE VAS", botón **PREDICCIÓN** en azul cielo).
+  - **Pantalla 3: Pronóstico y Riesgo** ("¿Por dónde lloverá hoy?") con píldoras de lluvia (`pronosticolluvia.png`), semáforo de riesgo por colonia (Alto, Medio, Bajo) y observaciones meteorológicas en vivo de Open-Meteo.
+  - **Leaflet.js + OpenStreetMap**: Visualización cartográfica interactiva con pin personalizado estilo mockup, marcadores de incidentes y zonas de riesgo.
   - **Georreferenciación con un clic**: Haz clic sobre cualquier punto del mapa para asignar automáticamente las coordenadas `lat` y `lng` al reporte.
 - **Backend en Python (Flask)**:
   - Servidor ligero y robusto en `app.py`.

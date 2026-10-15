@@ -101,7 +101,7 @@ RISK_ZONES = [
     },
 ]
 
-REPORT_TYPES = {"inundacion", "construccion", "accidente"}
+REPORT_TYPES = {"inundacion", "construccion", "accidente", "bloqueo"}
 
 
 def get_current_weather() -> dict[str, Any]:
@@ -166,6 +166,11 @@ def read_reports() -> list[dict[str, Any]]:
     if not isinstance(reports, list):
         raise ValueError("El archivo de reportes debe contener una lista JSON.")
     return reports
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return app.send_static_file("favicon.ico")
 
 
 @app.get("/")

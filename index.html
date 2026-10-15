@@ -3,226 +3,782 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b1220">
-    <title>OlaRuta | Monitoreo de Inundaciones - Ciudad del Carmen</title>
+    <meta name="theme-color" content="#07162c">
+    <title>OlaRuta | Monitoreo Vial e Inundaciones - Ciudad del Carmen</title>
+
+    <!-- Favicon con el icono oficial de OlaRuta -->
+    <link rel="icon" type="image/png" href="static/img/icon.png">
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              olaruta: {
+                navy: '#07162c',
+                navylight: '#0f2747',
+                accent: '#38bdf8',
+                amber: '#fbb03b',
+                amberdark: '#f59e0b',
+                cream: '#fef9c3',
+                paleblue: '#e0f7fa',
+                paleborder: '#80deea'
+              }
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Leaflet CSS -->
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     >
+
     <style>
-      body { background: #f4f7fb; }
-      #map { min-height: 420px; }
-      .leaflet-container { font: inherit; }
+      body {
+        background-color: #f8fafc;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      }
+      #map {
+        min-height: 480px;
+        height: 100%;
+        width: 100%;
+        border-radius: 1.25rem;
+      }
       @media (min-width: 1024px) {
-        #map { min-height: calc(100vh - 5.5rem); }
+        #map {
+          min-height: calc(100vh - 7rem);
+        }
+      }
+      .leaflet-container {
+        font: inherit;
+      }
+
+      /* Pin de mapa estilo mockup OlaRuta */
+      .olaruta-custom-pin {
+        width: 32px;
+        height: 32px;
+        border-radius: 50% 50% 50% 0;
+        background: #f87171;
+        position: absolute;
+        transform: rotate(-45deg);
+        left: 50%;
+        top: 50%;
+        margin: -24px 0 0 -16px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+        border: 2px solid #ffffff;
+        transition: transform 0.2s ease;
+      }
+      .olaruta-custom-pin::after {
+        content: '';
+        width: 14px;
+        height: 14px;
+        margin: 7px 0 0 7px;
+        background: #ffffff;
+        position: absolute;
+        border-radius: 50%;
+      }
+
+      /* Card selection active states */
+      .incident-card {
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+        user-select: none;
+      }
+      .incident-card:hover {
+        transform: translateY(-2px);
+      }
+      .incident-card.active {
+        ring: 3px;
+        transform: scale(1.03);
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.15);
+      }
+
+      /* Animaciones de cambio de pantalla */
+      .fade-enter {
+        animation: fadeIn 0.25s ease-out forwards;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
     </style>
   </head>
-  <body class="min-h-screen text-slate-800 antialiased">
-    <header class="border-b border-slate-200 bg-white shadow-sm">
-      <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6">
-        <a class="flex items-center gap-3" href="/" aria-label="OlaRuta, inicio">
-          <span class="grid h-10 w-10 place-items-center rounded-xl bg-cyan-600 text-xl text-white shadow-sm" aria-hidden="true">🌊</span>
-          <span>
-            <span class="block text-lg font-bold tracking-tight text-slate-900">OlaRuta</span>
-            <span class="block text-xs text-slate-500">Ciudad del Carmen, Campeche</span>
-          </span>
+  <body class="min-h-screen text-slate-800 antialiased flex flex-col">
+
+    <!-- NAVBAR SUPERIOR -->
+    <header class="bg-[#07162c] text-white shadow-md sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        
+        <!-- Logo e Icono Oficial de OlaRuta -->
+        <a href="/" class="flex items-center gap-3.5 group select-none">
+          <img
+            src="static/img/icon.png"
+            alt="Icono OlaRuta"
+            class="h-10 w-10 sm:h-11 sm:w-11 object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.5)] transition group-hover:scale-105"
+          >
+          <img
+            src="static/img/logo.png"
+            alt="Logo OlaRuta"
+            class="h-7 sm:h-8 w-auto object-contain"
+          >
         </a>
-        <span class="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
-          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-          Monitoreo ciudadano
-        </span>
+
+        <!-- Indicador en vivo y Botón Menú Hamburguesa -->
+        <div class="flex items-center gap-3">
+          <span class="hidden sm:inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            En vivo · Ciudad del Carmen
+          </span>
+
+          <button
+            id="menu-toggle-btn"
+            type="button"
+            class="p-2 text-slate-200 hover:text-white hover:bg-slate-800/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400 transition"
+            aria-label="Abrir menú"
+          >
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-screen-2xl p-4 sm:p-6">
-      <div class="mb-5">
-        <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">OlaRuta · Centro de monitoreo</p>
-        <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Lluvia y zonas de riesgo</h1>
-        <p class="mt-1 text-sm text-slate-600">Consulta las condiciones actuales y comparte lo que ocurre en tu calle.</p>
+    <!-- MENÚ LATERAL DESPLEGABLE (DRAWER) -->
+    <div id="drawer-menu" class="fixed inset-0 z-50 hidden">
+      <div id="drawer-backdrop" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"></div>
+      <div class="fixed inset-y-0 right-0 max-w-xs w-full bg-[#07162c] text-white shadow-2xl p-6 flex flex-col justify-between z-10">
+        <div>
+          <div class="flex items-center justify-between pb-4 border-b border-slate-700/60">
+            <div class="flex items-center gap-2">
+              <img src="static/img/icon.png" class="h-8 w-8 object-contain" alt="OR">
+              <span class="font-bold text-lg tracking-wide text-cyan-400">OlaRuta</span>
+            </div>
+            <button id="drawer-close-btn" class="p-1.5 text-slate-400 hover:text-white rounded-lg">
+              ✕
+            </button>
+          </div>
+
+          <nav class="mt-6 space-y-3">
+            <button id="nav-report-btn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-left font-medium text-sm text-cyan-300 transition">
+              <span>📍</span> Reportar Incidente (Inicio)
+            </button>
+            <button id="nav-predict-btn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-left font-medium text-sm text-amber-300 transition">
+              <span>🔮</span> Consulta de Predicción
+            </button>
+            <button id="nav-forecast-btn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-left font-medium text-sm text-sky-300 transition">
+              <span>🌧️</span> Pronóstico y Riesgo de Lluvia
+            </button>
+            <button id="nav-reports-list-btn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-left font-medium text-sm text-slate-200 transition">
+              <span>📋</span> Ver Reportes de la Comunidad
+            </button>
+          </nav>
+        </div>
+
+        <div class="pt-6 border-t border-slate-700/60 text-xs text-slate-400 space-y-2">
+          <p class="font-semibold text-slate-300">OlaRuta Carmen</p>
+          <p>Datos meteorológicos en tiempo real impulsados por Open-Meteo y reportes ciudadanos.</p>
+          <p class="text-[11px] text-slate-500">© 2026 OlaRuta</p>
+        </div>
       </div>
+    </div>
 
-      <div class="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside class="space-y-4">
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="weather-heading">
-            <div class="flex items-center justify-between">
-              <h2 id="weather-heading" class="font-semibold text-slate-900">Clima actual</h2>
-              <span class="rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800">Open-Meteo</span>
-            </div>
-            <p id="weather-state" class="mt-4 text-sm text-slate-500" role="status" aria-live="polite">Consultando condiciones...</p>
-            <div id="weather-data" class="mt-4 hidden">
-              <div class="flex items-end gap-2">
-                <span id="precipitation" class="text-4xl font-bold tracking-tight text-slate-950">--</span>
-                <span class="pb-1 text-sm text-slate-500">mm de precipitación</span>
-              </div>
-              <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="rounded-xl bg-slate-50 p-3">
-                  <p class="text-xs text-slate-500">Temperatura</p>
-                  <p id="temperature" class="mt-1 font-semibold text-slate-800">--</p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-3">
-                  <p class="text-xs text-slate-500">Humedad</p>
-                  <p id="humidity" class="mt-1 font-semibold text-slate-800">--</p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-3">
-                  <p class="text-xs text-slate-500">Viento</p>
-                  <p id="wind" class="mt-1 font-semibold text-slate-800">--</p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-3">
-                  <p class="text-xs text-slate-500">Actualizado</p>
-                  <p id="observed-at" class="mt-1 font-semibold text-slate-800">--</p>
-                </div>
-              </div>
-            </div>
-          </section>
+    <!-- CONTENEDOR PRINCIPAL: PANTALLA DIVIDIDA (MAPA + PANEL) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      
+      <!-- COLUMNA IZQUIERDA: MAPA INTERACTIVO -->
+      <section class="lg:col-span-7 bg-white rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-200 flex flex-col" aria-label="Mapa de monitoreo">
+        <div class="flex items-center justify-between mb-3 px-2">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700">Mapa Satelital / Vial</h2>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></i>Bajo</span>
+            <span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-amber-500 inline-block"></i>Medio</span>
+            <span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-red-500 inline-block"></i>Alto</span>
+          </div>
+        </div>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="zones-heading">
-            <div class="flex items-center justify-between">
-              <h2 id="zones-heading" class="font-semibold text-slate-900">Zonas de riesgo</h2>
-              <span class="text-xs text-slate-500">Estimación actual</span>
-            </div>
-            <ul id="zone-list" class="mt-3 divide-y divide-slate-100">
-              <li class="py-3 text-sm text-slate-500">Cargando zonas...</li>
-            </ul>
-            <p class="mt-3 text-xs leading-5 text-slate-500">
-              Niveles orientativos calculados con lluvia actual y riesgo base de cada zona; no sustituyen avisos oficiales.
-            </p>
-          </section>
+        <!-- Contenedor del Mapa Leaflet -->
+        <div id="map" class="shadow-inner" role="application" aria-label="Mapa interactivo de Ciudad del Carmen"></div>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="report-heading">
-            <h2 id="report-heading" class="font-semibold text-slate-900">Crear reporte ciudadano</h2>
-            <p class="mt-1 text-sm text-slate-500">Reporta inundaciones, obras o accidentes en tu calle.</p>
-            <form id="report-form" class="mt-4 space-y-3">
-              <div>
-                <label for="street" class="mb-1 block text-sm font-medium text-slate-700">Calle o ubicación</label>
-                <input
-                  id="street"
-                  name="street"
-                  type="text"
-                  maxlength="160"
-                  autocomplete="street-address"
-                  required
-                  placeholder="Ej. Calle 31, Centro"
-                  class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+        <div class="mt-3 px-2 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+          <span id="map-hint">📍 Haz clic en cualquier calle para situar tu reporte</span>
+          <span>© OpenStreetMap · Open-Meteo Live</span>
+        </div>
+      </section>
+
+      <!-- COLUMNA DERECHA: PANELES INTERACTIVOS (PANTALLA 1 O PANTALLA 3) -->
+      <section class="lg:col-span-5 bg-white rounded-3xl p-5 sm:p-7 shadow-sm border border-slate-200 relative min-h-[520px] flex flex-col justify-between">
+        
+        <!-- ============================================== -->
+        <!-- PANTALLA 1: REPORTE CIUDADANO (SCREEN 1) -->
+        <!-- ============================================== -->
+        <div id="screen-report" class="fade-enter flex flex-col justify-between h-full">
+          <div>
+            <!-- Título y subtítulo exactos del Mockup -->
+            <div class="mb-4">
+              <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
+                ¿Qué está pasando en tu <span class="text-[#f59e0b]">ubicación</span>?
+              </h1>
+              <p class="text-xs sm:text-sm text-slate-600 font-medium mt-1">
+                Se registrará tu reporte en el mapa de forma inmediata
+              </p>
+            </div>
+
+            <!-- Formulario de Reporte -->
+            <form id="incident-form" class="space-y-4">
+              
+              <!-- 3 TARJETAS DE CATEGORÍA (MOCKUP OFICIAL) -->
+              <div class="grid grid-cols-3 gap-2.5 sm:gap-3 my-2" role="radiogroup" aria-label="Selecciona tipo de reporte">
+                
+                <!-- Tarjeta 1: Accidente -->
+                <div
+                  id="card-accidente"
+                  data-type="accidente"
+                  class="incident-card rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center bg-[#fefce8] border-2 border-[#facc15] shadow-xs hover:border-amber-400 transition"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="0"
                 >
-              </div>
-              <div>
-                <label for="report-type" class="mb-1 block text-sm font-medium text-slate-700">Tipo de reporte</label>
-                <select
-                  id="report-type"
-                  name="tipo"
-                  required
-                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                  <img
+                    src="static/img/accidente.png"
+                    alt="Accidente"
+                    class="h-10 sm:h-12 w-auto object-contain mx-auto"
+                  >
+                  <span class="text-xs sm:text-sm font-bold text-slate-800 mt-2 text-center leading-tight">
+                    Accidente
+                  </span>
+                </div>
+
+                <!-- Tarjeta 2: Inundación -->
+                <div
+                  id="card-inundacion"
+                  data-type="inundacion"
+                  class="incident-card rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center bg-[#e0f2fe] border-2 border-[#38bdf8] shadow-xs hover:border-cyan-400 transition"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="0"
                 >
-                  <option value="" disabled selected>Selecciona un tipo</option>
-                  <option value="inundacion">🔴 Inundación / Anegamiento</option>
-                  <option value="construccion">🔵 En Construcción / Remodelación</option>
-                  <option value="accidente">🟠 Accidente / Obstrucción vial</option>
-                </select>
+                  <img
+                    src="static/img/inundaciones.png"
+                    alt="Inundación"
+                    class="h-10 sm:h-12 w-auto object-contain mx-auto"
+                  >
+                  <span class="text-xs sm:text-sm font-bold text-slate-800 mt-2 text-center leading-tight">
+                    Inundación
+                  </span>
+                </div>
+
+                <!-- Tarjeta 3: Cierre / Bloqueo -->
+                <div
+                  id="card-bloqueo"
+                  data-type="bloqueo"
+                  class="incident-card rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center bg-[#fee2e2] border-2 border-[#f87171] shadow-xs hover:border-red-400 transition"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="0"
+                >
+                  <img
+                    src="static/img/bloqueos.png"
+                    alt="Cierre o Bloqueo"
+                    class="h-10 sm:h-12 w-auto object-contain mx-auto"
+                  >
+                  <span class="text-xs sm:text-sm font-bold text-slate-800 mt-2 text-center leading-tight">
+                    Cierre / Bloqueo
+                  </span>
+                </div>
               </div>
-              <div>
-                <label for="description" class="mb-1 block text-sm font-medium text-slate-700">Descripción (opcional)</label>
-                <textarea
-                  id="description"
-                  name="descripcion"
-                  maxlength="1000"
-                  rows="2"
-                  placeholder="Agrega detalles útiles para la comunidad"
-                  class="w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
-                ></textarea>
+
+              <!-- Campo oculto para el tipo seleccionado -->
+              <input type="hidden" id="report-type-input" name="tipo" value="">
+              <input type="hidden" id="report-lat" name="lat" value="">
+              <input type="hidden" id="report-lng" name="lng" value="">
+
+              <!-- Inputs de Calle y Descripción -->
+              <div class="space-y-2 mt-3">
+                <div>
+                  <label for="report-street-input" class="block text-xs font-semibold text-slate-600 mb-1">
+                    Calle o Referencia *
+                  </label>
+                  <input
+                    type="text"
+                    id="report-street-input"
+                    name="calle"
+                    required
+                    maxlength="160"
+                    placeholder="Ej. Calle 35 por 56, Col. Benito Juárez"
+                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition"
+                  >
+                </div>
+
+                <div>
+                  <label for="report-desc-input" class="block text-xs font-semibold text-slate-600 mb-1">
+                    Descripción adicional (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    id="report-desc-input"
+                    name="descripcion"
+                    maxlength="300"
+                    placeholder="Detalles útiles (carril cerrado, agua a media banqueta, etc.)"
+                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition"
+                  >
+                </div>
+
+                <div id="coords-status" class="text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5">
+                  <span>📍</span>
+                  <span id="coords-text">Haz clic en el mapa para marcar la ubicación exacta (opcional)</span>
+                </div>
               </div>
-              <input id="report-lat" name="lat" type="hidden">
-              <input id="report-lng" name="lng" type="hidden">
-              <p id="report-location" class="text-xs text-slate-500">Opcional: haz clic en el mapa para señalar la ubicación.</p>
-              <button
-                id="report-submit"
-                type="submit"
-                class="w-full rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Enviar reporte
-              </button>
-              <p id="report-message" class="text-sm" role="status" aria-live="polite"></p>
+
+              <!-- Mensaje de estado -->
+              <p id="report-feedback" class="text-xs font-medium text-center min-h-[1.25rem]"></p>
+
+              <!-- BOTONES PRINCIPALES DE ACCIÓN (ESTILO MOCKUP) -->
+              <div class="space-y-2.5 pt-1">
+                <!-- Botón REPORTAR (Amarillo / Ámbar) -->
+                <button
+                  type="submit"
+                  id="btn-submit-report"
+                  class="w-full max-w-xs mx-auto block py-3 px-6 rounded-full font-bold text-sm sm:text-base text-white bg-[#fbb03b] hover:bg-[#f59e0b] active:scale-95 shadow-md shadow-amber-500/20 transition-all text-center tracking-wide"
+                >
+                  Reportar
+                </button>
+
+                <!-- Botón PREDICCIONES (Ámbar / Naranja) -->
+                <button
+                  type="button"
+                  id="btn-open-predictions"
+                  class="w-full max-w-xs mx-auto block py-3 px-6 rounded-full font-bold text-sm sm:text-base text-white bg-[#f59e0b] hover:bg-[#d97706] active:scale-95 shadow-md shadow-orange-500/20 transition-all text-center tracking-wide"
+                >
+                  Predicciones
+                </button>
+              </div>
             </form>
-            <div class="mt-4 border-t border-slate-100 pt-3">
-              <h3 class="text-sm font-medium text-slate-800">Reportes recientes</h3>
-              <ul id="report-list" class="mt-2 space-y-2 text-sm text-slate-600">
-                <li>Cargando reportes...</li>
-              </ul>
-            </div>
-          </section>
-        </aside>
+          </div>
 
-        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Mapa de zonas de riesgo">
-          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-            <div>
-              <h2 class="font-semibold text-slate-900">Mapa de Ciudad del Carmen</h2>
-              <p class="text-xs text-slate-500">Haz clic en el mapa para ubicar un reporte o selecciona un marcador</p>
+          <!-- BOTÓN REGRESAR (ESQUINA INFERIOR DERECHA MOCKUP) -->
+          <div class="pt-4 flex justify-end">
+            <button
+              type="button"
+              id="btn-reset-report"
+              class="bg-[#fef9c3] hover:bg-[#fef08a] text-slate-700 font-semibold py-1.5 px-5 rounded-full text-xs shadow-xs transition hover:shadow"
+            >
+              Regresar
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- PANTALLA 3: PRONÓSTICO Y RIESGO (SCREEN 3) -->
+        <!-- ============================================== -->
+        <div id="screen-forecast" class="hidden fade-enter flex flex-col justify-between h-full">
+          <div>
+            <!-- Header oficial del Mockup -->
+            <div class="mb-4">
+              <h2 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
+                ¿Por dónde <span class="text-[#38bdf8]">lloverá</span> hoy?
+              </h2>
+              <p class="text-xs sm:text-sm text-slate-600 font-medium mt-1">
+                Pronóstico de lluvias
+              </p>
             </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-600" aria-label="Leyenda del mapa">
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-green-500"></i>Verde</span>
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-amber-500"></i>Amarillo</span>
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-500"></i>Rojo</span>
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-600"></i>Inundación</span>
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-blue-600"></i>Construcción</span>
-              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-orange-500"></i>Accidente</span>
+
+            <!-- Píldoras de pronóstico con pronosticolluvia.png -->
+            <div class="space-y-2.5 my-3">
+              <!-- Píldora 1: Playa Norte -->
+              <div class="bg-[#e0f7fa] border border-[#80deea] rounded-full py-2.5 px-4 flex items-center gap-3 shadow-xs hover:shadow transition">
+                <img
+                  src="static/img/pronosticolluvia.png"
+                  alt="Lluvia"
+                  class="h-7 w-7 object-contain shrink-0"
+                >
+                <div class="text-xs sm:text-sm text-slate-800">
+                  <strong class="font-bold text-slate-900">Playa norte</strong>
+                  <span id="forecast-pill-1" class="text-slate-700"> - 85% de probabilidad (5:00 pm)</span>
+                </div>
+              </div>
+
+              <!-- Píldora 2: Col. Centro -->
+              <div class="bg-[#e0f7fa] border border-[#80deea] rounded-full py-2.5 px-4 flex items-center gap-3 shadow-xs hover:shadow transition">
+                <img
+                  src="static/img/pronosticolluvia.png"
+                  alt="Lluvia"
+                  class="h-7 w-7 object-contain shrink-0"
+                >
+                <div class="text-xs sm:text-sm text-slate-800">
+                  <strong class="font-bold text-slate-900">Col. centro</strong>
+                  <span id="forecast-pill-2" class="text-slate-700"> - 85% de probabilidad (7:00 pm)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resumen meteorológico en tiempo real (Open-Meteo) -->
+            <div class="bg-cyan-50/80 border border-cyan-200/60 rounded-2xl p-3 my-3">
+              <div class="flex items-center justify-between text-xs text-cyan-900 mb-2">
+                <span class="font-bold flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+                  Observaciones Open-Meteo
+                </span>
+                <span id="meteo-time" class="text-[11px] text-cyan-700">Actualizado</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="bg-white/80 rounded-xl p-1.5 border border-cyan-100">
+                  <span class="block text-[10px] text-slate-500">Lluvia</span>
+                  <strong id="meteo-rain" class="text-xs sm:text-sm text-slate-800">0.0 mm</strong>
+                </div>
+                <div class="bg-white/80 rounded-xl p-1.5 border border-cyan-100">
+                  <span class="block text-[10px] text-slate-500">Temp</span>
+                  <strong id="meteo-temp" class="text-xs sm:text-sm text-slate-800">-- °C</strong>
+                </div>
+                <div class="bg-white/80 rounded-xl p-1.5 border border-cyan-100">
+                  <span class="block text-[10px] text-slate-500">Humedad</span>
+                  <strong id="meteo-humidity" class="text-xs sm:text-sm text-slate-800">-- %</strong>
+                </div>
+                <div class="bg-white/80 rounded-xl p-1.5 border border-cyan-100">
+                  <span class="block text-[10px] text-slate-500">Viento</span>
+                  <strong id="meteo-wind" class="text-xs sm:text-sm text-slate-800">-- km/h</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECCIÓN: RIESGO DE INUNDACIÓN POR ZONA (MOCKUP OFICIAL) -->
+            <div class="mt-4">
+              <h3 class="text-base sm:text-lg font-black text-slate-900 mb-2">
+                Riesgo de <span class="text-[#38bdf8]">inundación</span> por zona
+              </h3>
+
+              <div class="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5">
+                <!-- Nivel Alto -->
+                <div class="flex items-start gap-2.5 text-xs sm:text-sm">
+                  <span class="h-3 w-3 rounded-full bg-[#ef4444] mt-1 shrink-0"></span>
+                  <div>
+                    <strong class="text-[#ef4444] font-bold">Alto:</strong>
+                    <span id="risk-alto-text" class="text-slate-700 ml-1">Col. 23 de Julio, Arroyo de los Franceses</span>
+                  </div>
+                </div>
+
+                <!-- Nivel Medio -->
+                <div class="flex items-start gap-2.5 text-xs sm:text-sm">
+                  <span class="h-3 w-3 rounded-full bg-[#f59e0b] mt-1 shrink-0"></span>
+                  <div>
+                    <strong class="text-[#f59e0b] font-bold">Medio:</strong>
+                    <span id="risk-medio-text" class="text-slate-700 ml-1">Av. Isla de Tris y Av. Aviación, Centro Histórico</span>
+                  </div>
+                </div>
+
+                <!-- Nivel Bajo -->
+                <div class="flex items-start gap-2.5 text-xs sm:text-sm">
+                  <span class="h-3 w-3 rounded-full bg-[#22c55e] mt-1 shrink-0"></span>
+                  <div>
+                    <strong class="text-[#22c55e] font-bold">Bajo:</strong>
+                    <span id="risk-bajo-text" class="text-slate-700 ml-1">Col. San Nicolás, Justo Sierra</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div id="map" role="application" aria-label="Mapa interactivo con las zonas de riesgo"></div>
-          <div class="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-            Mapa © OpenStreetMap contributors · Niveles de riesgo orientativos
+
+          <!-- BOTÓN REGRESAR (ESQUINA INFERIOR DERECHA) -->
+          <div class="pt-4 flex justify-end">
+            <button
+              type="button"
+              id="btn-back-to-report"
+              class="bg-[#fef9c3] hover:bg-[#fef08a] text-slate-700 font-semibold py-1.5 px-5 rounded-full text-xs shadow-xs transition hover:shadow"
+            >
+              Regresar
+            </button>
           </div>
-        </section>
-      </div>
+        </div>
+
+      </section>
     </main>
 
+    <!-- ============================================== -->
+    <!-- MODAL DE PREDICCIÓN (SCREEN 2 - POPUP) -->
+    <!-- ============================================== -->
+    <div id="modal-prediction" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+      <!-- Backdrop transparente -->
+      <div id="modal-prediction-backdrop" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity"></div>
+
+      <!-- Tarjeta del modal -->
+      <div class="relative bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 z-10 fade-enter text-center">
+        <!-- Botón cerrar -->
+        <button
+          id="modal-prediction-close"
+          class="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          aria-label="Cerrar modal"
+        >
+          ✕
+        </button>
+
+        <form id="form-prediction" class="space-y-4 pt-2">
+          <!-- Campo HORA -->
+          <div>
+            <input
+              type="text"
+              id="pred-hora"
+              placeholder="HORA"
+              value="5:00 pm"
+              class="w-full bg-[#e0f7fa] border border-[#80deea] rounded-full py-3 px-5 text-center text-sm font-bold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition"
+              required
+            >
+          </div>
+
+          <!-- Campo A DONDE VAS -->
+          <div>
+            <input
+              type="text"
+              id="pred-destino"
+              placeholder="A DONDE VAS"
+              value="Playa norte"
+              class="w-full bg-[#e0f7fa] border border-[#80deea] rounded-full py-3 px-5 text-center text-sm font-bold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition"
+              required
+            >
+          </div>
+
+          <!-- Botón PREDICCIÓN (Azul cielo del mockup) -->
+          <div class="pt-2">
+            <button
+              type="submit"
+              class="w-full py-3 px-8 rounded-full font-black text-sm uppercase tracking-wider text-white bg-[#38bdf8] hover:bg-[#0284c7] active:scale-95 shadow-md shadow-sky-500/25 transition-all"
+            >
+              PREDICCIÓN
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL DE LISTA DE REPORTES DE LA COMUNIDAD -->
+    <!-- ============================================== -->
+    <div id="modal-reports-history" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+      <div id="modal-reports-backdrop" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs"></div>
+      <div class="relative bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-slate-100 z-10 max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">📋</span>
+            <h3 class="font-bold text-slate-900 text-base">Reportes de la Comunidad</h3>
+          </div>
+          <button id="modal-reports-close" class="p-1 text-slate-400 hover:text-slate-600 rounded-full">
+            ✕
+          </button>
+        </div>
+        <div class="overflow-y-auto py-3 space-y-2 flex-1">
+          <ul id="full-report-list" class="space-y-2.5">
+            <li class="text-xs text-slate-400 text-center py-4">Cargando reportes...</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaflet JS -->
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <script>
-      const JINJA_STATUS_URL = "{{ url_for('api_status') }}";
-      const JINJA_REPORTS_URL = "{{ url_for('api_reports') }}";
 
-      const map = L.map("map").setView([18.6575, -91.8325], 13);
+    <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
+    <script>
+      // Endpoints universales (compatibles con Flask y Live Server)
+      const STATUS_URL = "/api/status";
+      const REPORTS_URL = "/api/reports";
+
+      // 1. Inicialización del Mapa Leaflet
+      const map = L.map("map", {
+        zoomControl: true,
+        scrollWheelZoom: true
+      }).setView([18.6575, -91.8325], 13);
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(map);
 
+      // Icono de Pin personalizado idéntico al mockup
+      const olarutaPinIcon = L.divIcon({
+        className: 'olaruta-pin-wrapper',
+        html: '<div class="olaruta-custom-pin"></div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+
       let selectedLocationMarker = null;
+
+      // Evento de clic en el mapa para situar incidente
       map.on("click", (event) => {
         const { lat, lng } = event.latlng;
         document.getElementById("report-lat").value = lat.toFixed(6);
         document.getElementById("report-lng").value = lng.toFixed(6);
-        document.getElementById("report-location").textContent =
-          `Ubicación seleccionada: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        document.getElementById("coords-text").textContent =
+          `Ubicación fijada: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        document.getElementById("coords-status").className =
+          "text-[11px] text-emerald-600 font-semibold flex items-center gap-1.5 pt-0.5";
+
         if (selectedLocationMarker) {
           selectedLocationMarker.setLatLng(event.latlng);
         } else {
-          selectedLocationMarker = L.marker(event.latlng).addTo(map);
+          selectedLocationMarker = L.marker(event.latlng, { icon: olarutaPinIcon }).addTo(map);
         }
-        selectedLocationMarker.bindPopup("Ubicación del nuevo reporte").openPopup();
+        selectedLocationMarker.bindPopup("<strong>Ubicación de tu reporte</strong><br>Listo para enviar").openPopup();
       });
 
-      const markers = [];
-      const reportMarkers = [];
-      const zoneList = document.getElementById("zone-list");
-      const reportList = document.getElementById("report-list");
-      const reportTypeColors = {
-        inundacion: "#dc2626",
-        construccion: "#2563eb",
-        accidente: "#f97316"
-      };
-      const reportTypeLabels = {
-        inundacion: "Inundación / Anegamiento",
-        construccion: "Construcción / Remodelación",
-        accidente: "Accidente / Obstrucción vial"
-      };
+      // 2. Manejo de selección de categorías (Accidente, Inundación, Cierre/Bloqueo)
+      const cards = document.querySelectorAll(".incident-card");
+      const reportTypeInput = document.getElementById("report-type-input");
 
+      function selectIncidentType(type) {
+        reportTypeInput.value = type;
+        cards.forEach((c) => {
+          if (c.dataset.type === type) {
+            c.classList.add("active", "ring-4", "ring-amber-400");
+            c.setAttribute("aria-checked", "true");
+          } else {
+            c.classList.remove("active", "ring-4", "ring-amber-400", "ring-cyan-400", "ring-red-400");
+            c.setAttribute("aria-checked", "false");
+          }
+        });
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener("click", () => {
+          selectIncidentType(card.dataset.type);
+        });
+      });
+
+      // Seleccionar "inundacion" por defecto
+      selectIncidentType("inundacion");
+
+      // 3. Manejo de navegación entre pantallas (Screen 1, Screen 2 Modal, Screen 3)
+      const screenReport = document.getElementById("screen-report");
+      const screenForecast = document.getElementById("screen-forecast");
+      const modalPrediction = document.getElementById("modal-prediction");
+
+      function showScreen(name) {
+        if (name === "forecast") {
+          screenReport.classList.add("hidden");
+          screenForecast.classList.remove("hidden");
+        } else {
+          screenForecast.classList.add("hidden");
+          screenReport.classList.remove("hidden");
+        }
+      }
+
+      // Abrir modal de predicción al dar clic en botón "Predicciones"
+      document.getElementById("btn-open-predictions").addEventListener("click", () => {
+        modalPrediction.classList.remove("hidden");
+      });
+
+      // Cerrar modal
+      function closeModalPrediction() {
+        modalPrediction.classList.add("hidden");
+      }
+      document.getElementById("modal-prediction-close").addEventListener("click", closeModalPrediction);
+      document.getElementById("modal-prediction-backdrop").addEventListener("click", closeModalPrediction);
+
+      // Enviar formulario de predicción -> Abre Pantalla 3
+      document.getElementById("form-prediction").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const hora = document.getElementById("pred-hora").value.trim() || "5:00 pm";
+        const destino = document.getElementById("pred-destino").value.trim() || "Playa norte";
+        
+        // Actualizar píldoras con los datos seleccionados
+        document.getElementById("forecast-pill-1").textContent = ` - 85% de probabilidad (${hora})`;
+        document.getElementById("forecast-pill-2").textContent = ` - Riesgo estimado para ${destino}`;
+        
+        closeModalPrediction();
+        showScreen("forecast");
+      });
+
+      // Botón "Regresar" en Pantalla 3 -> Vuelve a Pantalla 1
+      document.getElementById("btn-back-to-report").addEventListener("click", () => {
+        showScreen("report");
+      });
+
+      // Botón "Regresar" en Pantalla 1 -> Limpia formulario y centra mapa
+      document.getElementById("btn-reset-report").addEventListener("click", () => {
+        document.getElementById("incident-form").reset();
+        selectIncidentType("inundacion");
+        document.getElementById("report-lat").value = "";
+        document.getElementById("report-lng").value = "";
+        document.getElementById("coords-text").textContent = "Haz clic en el mapa para marcar la ubicación exacta (opcional)";
+        document.getElementById("coords-status").className = "text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5";
+        if (selectedLocationMarker) {
+          map.removeLayer(selectedLocationMarker);
+          selectedLocationMarker = null;
+        }
+        map.setView([18.6575, -91.8325], 13);
+      });
+
+      // 4. Menú lateral (Drawer)
+      const drawerMenu = document.getElementById("drawer-menu");
+      const menuToggleBtn = document.getElementById("menu-toggle-btn");
+      const drawerCloseBtn = document.getElementById("drawer-close-btn");
+      const drawerBackdrop = document.getElementById("drawer-backdrop");
+
+      function toggleDrawer(open) {
+        if (open) {
+          drawerMenu.classList.remove("hidden");
+        } else {
+          drawerMenu.classList.add("hidden");
+        }
+      }
+
+      menuToggleBtn.addEventListener("click", () => toggleDrawer(true));
+      drawerCloseBtn.addEventListener("click", () => toggleDrawer(false));
+      drawerBackdrop.addEventListener("click", () => toggleDrawer(false));
+
+      document.getElementById("nav-report-btn").addEventListener("click", () => {
+        showScreen("report");
+        toggleDrawer(false);
+      });
+      document.getElementById("nav-predict-btn").addEventListener("click", () => {
+        toggleDrawer(false);
+        modalPrediction.classList.remove("hidden");
+      });
+      document.getElementById("nav-forecast-btn").addEventListener("click", () => {
+        showScreen("forecast");
+        toggleDrawer(false);
+      });
+      document.getElementById("nav-reports-list-btn").addEventListener("click", () => {
+        toggleDrawer(false);
+        openReportsModal();
+      });
+
+      // Modal de Reportes de la Comunidad
+      const modalReportsHistory = document.getElementById("modal-reports-history");
+      const modalReportsClose = document.getElementById("modal-reports-close");
+      const modalReportsBackdrop = document.getElementById("modal-reports-backdrop");
+
+      function openReportsModal() {
+        modalReportsHistory.classList.remove("hidden");
+      }
+      function closeReportsModal() {
+        modalReportsHistory.classList.add("hidden");
+      }
+      modalReportsClose.addEventListener("click", closeReportsModal);
+      modalReportsBackdrop.addEventListener("click", closeReportsModal);
+
+      // 5. Gestión de Datos Meteorológicos y Zonas de Riesgo
       const DEFAULT_ZONES = [
         { name: "Centro Histórico", latitude: 18.6388, longitude: -91.8367, base_risk: 2 },
         { name: "Colonia Santa Margarita", latitude: 18.6505, longitude: -91.8298, base_risk: 3 },
@@ -236,286 +792,244 @@
         { name: "Playa Norte", latitude: 18.6604, longitude: -91.8068, base_risk: 2 }
       ];
 
+      const zoneMarkers = [];
+
       function computeRiskLevel(baseRisk, precipMm) {
-        if (precipMm >= 15 || baseRisk >= 3) return { level: "Rojo", color: "#ef4444" };
-        if (precipMm >= 5 || baseRisk >= 2) return { level: "Amarillo", color: "#f59e0b" };
-        return { level: "Verde", color: "#22c55e" };
+        if (precipMm >= 15 || baseRisk >= 3) return { level: "Alto", color: "#ef4444" };
+        if (precipMm >= 5 || baseRisk >= 2) return { level: "Medio", color: "#f59e0b" };
+        return { level: "Bajo", color: "#22c55e" };
       }
 
-      async function fetchOpenMeteoDirectly() {
-        const url = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Open-Meteo devolvió HTTP ${response.status}`);
-        }
-        const payload = await response.json();
-        const cur = payload.current || {};
-        const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
-        const zones = DEFAULT_ZONES.map((zone) => {
-          const risk = computeRiskLevel(zone.base_risk, precip);
-          return {
-            name: zone.name,
-            latitude: zone.latitude,
-            longitude: zone.longitude,
-            level: risk.level,
-            color: risk.color
-          };
-        });
-        return {
-          location: "Ciudad del Carmen",
-          weather: {
-            precipitation_mm: precip,
-            temperature_c: cur.temperature_2m,
-            humidity_percent: cur.relative_humidity_2m,
-            wind_speed_kmh: cur.wind_speed_10m,
-            observed_at: cur.time
-          },
-          zones: zones
-        };
-      }
+      function updateRiskZonesUI(zones) {
+        zoneMarkers.forEach((m) => map.removeLayer(m));
+        zoneMarkers.length = 0;
 
-      const numberOrDash = (value, unit) =>
-        typeof value === "number" ? `${value.toFixed(1)} ${unit}` : "--";
+        const altoList = [];
+        const medioList = [];
+        const bajoList = [];
 
-      function renderZones(zones) {
-        zoneList.replaceChildren();
-        markers.forEach((marker) => map.removeLayer(marker));
-        markers.length = 0;
+        zones.forEach((z) => {
+          if (z.level === "Alto" || z.level === "Rojo") altoList.push(z.name);
+          else if (z.level === "Medio" || z.level === "Amarillo") medioList.push(z.name);
+          else bajoList.push(z.name);
 
-        if (!Array.isArray(zones) || zones.length === 0) {
-          const item = document.createElement("li");
-          item.className = "py-3 text-sm text-slate-500";
-          item.textContent = "No hay zonas disponibles.";
-          zoneList.append(item);
-          return;
-        }
+          // Marcador circular en el mapa
+          const markerColor = (z.level === "Alto" || z.level === "Rojo") ? "#ef4444" :
+                              (z.level === "Medio" || z.level === "Amarillo") ? "#f59e0b" : "#22c55e";
 
-        zones.forEach((zone) => {
-          const item = document.createElement("li");
-          item.className = "flex items-center justify-between gap-3 py-3";
-
-          const name = document.createElement("span");
-          name.className = "text-sm font-medium text-slate-700";
-          name.textContent = zone.name;
-
-          const level = document.createElement("span");
-          level.className = "inline-flex items-center gap-2 text-sm font-semibold";
-          level.style.color = zone.color;
-          const dot = document.createElement("i");
-          dot.className = "h-2.5 w-2.5 rounded-full";
-          dot.style.backgroundColor = zone.color;
-          const label = document.createElement("span");
-          label.textContent = zone.level;
-          level.append(dot, label);
-          item.append(name, level);
-          zoneList.append(item);
-
-          const marker = L.circleMarker([zone.latitude, zone.longitude], {
+          const marker = L.circleMarker([z.latitude, z.longitude], {
             radius: 9,
             color: "#ffffff",
             weight: 2,
-            fillColor: zone.color,
-            fillOpacity: 0.95
+            fillColor: markerColor,
+            fillOpacity: 0.85
           }).addTo(map);
-          const popup = document.createElement("div");
-          const popupName = document.createElement("strong");
-          popupName.textContent = zone.name;
-          const popupLevel = document.createElement("div");
-          popupLevel.textContent = `Riesgo: ${zone.level}`;
-          popup.append(popupName, popupLevel);
-          marker.bindPopup(popup);
-          markers.push(marker);
+
+          marker.bindPopup(`<strong>${z.name}</strong><br>Nivel de Riesgo: <span style="color:${markerColor}; font-weight:bold;">${z.level}</span>`);
+          zoneMarkers.push(marker);
         });
 
-        if (markers.length) {
-          map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
-        }
+        // Actualizar textos de Pantalla 3
+        if (altoList.length) document.getElementById("risk-alto-text").textContent = altoList.slice(0, 3).join(", ");
+        if (medioList.length) document.getElementById("risk-medio-text").textContent = medioList.slice(0, 3).join(", ");
+        if (bajoList.length) document.getElementById("risk-bajo-text").textContent = bajoList.slice(0, 3).join(", ");
       }
 
-      async function loadStatus() {
-        const state = document.getElementById("weather-state");
-        let data = null;
-
-        const candidates = [];
-        if (JINJA_STATUS_URL.startsWith("/")) {
-          candidates.push(JINJA_STATUS_URL);
-        }
-        candidates.push("/api/status", "http://127.0.0.1:5000/api/status", "http://localhost:5000/api/status");
+      // Consulta de Clima con fallback directo a Open-Meteo
+      async function loadWeatherAndRisk() {
+        let weatherData = null;
+        const candidates = [STATUS_URL, "http://127.0.0.1:5000/api/status", "http://localhost:5000/api/status"];
 
         for (const url of candidates) {
           try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 2000);
-            const response = await fetch(url, { signal: controller.signal });
+            const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timer);
-            const ct = response.headers.get("content-type") || "";
-            if (response.ok && ct.toLowerCase().includes("json")) {
-              const resJson = await response.json();
-              if (resJson && resJson.weather && resJson.zones) {
-                data = resJson;
-                break;
+            if (res.ok) {
+              const ct = res.headers.get("content-type") || "";
+              if (ct.includes("json")) {
+                const data = await res.json();
+                if (data && data.weather) {
+                  weatherData = data;
+                  break;
+                }
               }
             }
           } catch (_) {}
         }
 
-        if (!data || !data.weather) {
+        // Si el backend no responde, consultar directamente Open-Meteo
+        if (!weatherData) {
           try {
-            data = await fetchOpenMeteoDirectly();
-          } catch (error) {
-            state.textContent = "No se pudo conectar con el servicio meteorológico de Open-Meteo.";
-            state.className = "mt-4 text-sm text-amber-700";
-            zoneList.replaceChildren();
-            const item = document.createElement("li");
-            item.className = "py-3 text-sm text-slate-500";
-            item.textContent = "No se pudieron cargar las zonas.";
-            zoneList.append(item);
-            return;
-          }
+            const openMeteoUrl = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
+            const res = await fetch(openMeteoUrl);
+            const data = await res.json();
+            const cur = data.current || {};
+            const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+            const computedZones = DEFAULT_ZONES.map(z => {
+              const r = computeRiskLevel(z.base_risk, precip);
+              return { name: z.name, latitude: z.latitude, longitude: z.longitude, level: r.level, color: r.color };
+            });
+            weatherData = {
+              weather: {
+                precipitation_mm: precip,
+                temperature_c: cur.temperature_2m,
+                humidity_percent: cur.relative_humidity_2m,
+                wind_speed_kmh: cur.wind_speed_10m,
+                observed_at: cur.time
+              },
+              zones: computedZones
+            };
+          } catch (_) {}
         }
 
-        renderZones(data.zones);
-        const weather = data.weather;
-        document.getElementById("weather-data").classList.remove("hidden");
-        document.getElementById("precipitation").textContent =
-          numberOrDash(weather.precipitation_mm, "mm");
-        document.getElementById("temperature").textContent =
-          numberOrDash(weather.temperature_c, "°C");
-        document.getElementById("humidity").textContent =
-          numberOrDash(weather.humidity_percent, "%");
-        document.getElementById("wind").textContent =
-          numberOrDash(weather.wind_speed_kmh, "km/h");
-        document.getElementById("observed-at").textContent =
-          weather.observed_at || "--";
-        state.textContent = `Condiciones en ${data.location} (En tiempo real)`;
-        state.className = "mt-4 text-sm text-slate-500";
+        if (weatherData && weatherData.weather) {
+          const w = weatherData.weather;
+          document.getElementById("meteo-rain").textContent = `${w.precipitation_mm ?? 0} mm`;
+          document.getElementById("meteo-temp").textContent = `${w.temperature_c ?? '--'}°C`;
+          document.getElementById("meteo-humidity").textContent = `${w.humidity_percent ?? '--'}%`;
+          document.getElementById("meteo-wind").textContent = `${w.wind_speed_kmh ?? '--'} km/h`;
+          if (w.observed_at) {
+            document.getElementById("meteo-time").textContent = w.observed_at.replace("T", " ");
+          }
+          if (weatherData.zones) {
+            updateRiskZonesUI(weatherData.zones);
+          }
+        }
       }
 
-      const LOCAL_REPORTS_KEY = "olaruta_reports_cache_v2";
-      function getLocalReports() {
+      // 6. Manejo de Reportes Ciudadanos
+      const reportMarkers = [];
+      const reportTypeIcons = {
+        accidente: "static/img/accidente.png",
+        inundacion: "static/img/inundaciones.png",
+        bloqueo: "static/img/bloqueos.png",
+        construccion: "static/img/bloqueos.png"
+      };
+      const reportTypeNames = {
+        accidente: "Accidente",
+        inundacion: "Inundación",
+        bloqueo: "Cierre / Bloqueo",
+        construccion: "En Construcción"
+      };
+
+      const CACHE_KEY = "olaruta_reports_v3";
+      function getCachedReports() {
         try {
-          const cached = localStorage.getItem(LOCAL_REPORTS_KEY);
-          if (cached) return JSON.parse(cached);
+          const raw = localStorage.getItem(CACHE_KEY);
+          if (raw) return JSON.parse(raw);
         } catch (_) {}
         return [
           {
-            calle: "Calle 35-D",
-            tipo: "inundacion",
-            descripcion: "Fuera de la privada zumarraga",
-            lat: 18.651324,
-            lng: -91.820844
-          },
-          {
-            calle: "Av. Concordia por Calle 56",
-            tipo: "construccion",
-            descripcion: "Reparación de rejilla pluvial y bacheo en carril derecho.",
-            lat: 18.6438,
-            lng: -91.829
-          },
-          {
             calle: "Av. Isla de Tris frente a Plaza Palmira",
             tipo: "accidente",
-            descripcion: "Vehículo varado por falla mecánica, precaución al circular.",
+            descripcion: "Colisión leve en carril izquierdo, tráfico lento.",
             lat: 18.6582,
             lng: -91.802
+          },
+          {
+            calle: "Calle 35-D por privada Zumpango",
+            tipo: "inundacion",
+            descripcion: "Acumulación de agua por lluvia pluvial.",
+            lat: 18.6513,
+            lng: -91.8208
+          },
+          {
+            calle: "Av. Concordia con Calle 56",
+            tipo: "bloqueo",
+            descripcion: "Reparación de alcantarilla, carril bloqueado.",
+            lat: 18.6438,
+            lng: -91.8290
           }
         ];
       }
 
       function saveLocalReport(rep) {
         try {
-          const list = getLocalReports();
-          list.push(rep);
-          localStorage.setItem(LOCAL_REPORTS_KEY, JSON.stringify(list));
+          const list = getCachedReports();
+          list.unshift(rep);
+          localStorage.setItem(CACHE_KEY, JSON.stringify(list));
         } catch (_) {}
       }
 
       function renderReports(reports) {
-        reportList.replaceChildren();
-        reportMarkers.forEach((marker) => map.removeLayer(marker));
+        reportMarkers.forEach(m => map.removeLayer(m));
         reportMarkers.length = 0;
 
-        if (!reports.length) {
-          const item = document.createElement("li");
-          item.textContent = "Aún no hay reportes.";
-          reportList.append(item);
+        const listContainer = document.getElementById("full-report-list");
+        listContainer.replaceChildren();
+
+        if (!reports || reports.length === 0) {
+          listContainer.innerHTML = '<li class="text-xs text-slate-400 text-center py-4">No hay reportes registrados aún.</li>';
           return;
         }
 
-        reports.forEach((report) => {
-          const streetName = report.calle || report.street || "Ubicación sin nombre";
-          const type = report.tipo || (report.water_level ? "inundacion" : "");
-          const description = report.descripcion || "";
+        reports.forEach((rep) => {
+          const tipo = rep.tipo || "inundacion";
+          const calle = rep.calle || rep.street || "Ubicación sin nombre";
+          const desc = rep.descripcion || "";
+          const iconUrl = reportTypeIcons[tipo] || "static/img/icon.png";
+          const nombreTipo = reportTypeNames[tipo] || "Incidente";
 
-          if (
-            Number.isFinite(Number(report.lat)) &&
-            Number.isFinite(Number(report.lng)) &&
-            report.lat !== null &&
-            report.lng !== null &&
-            reportTypeColors[type]
-          ) {
-            const marker = L.circleMarker([Number(report.lat), Number(report.lng)], {
-              radius: 8,
-              color: "#ffffff",
-              weight: 2,
-              fillColor: reportTypeColors[type],
-              fillOpacity: 0.95
-            }).addTo(map);
-            const popup = document.createElement("div");
-            const popupTitle = document.createElement("strong");
-            popupTitle.textContent = reportTypeLabels[type] || "Reporte";
-            const popupStreet = document.createElement("div");
-            popupStreet.textContent = streetName;
-            popup.append(popupTitle, popupStreet);
-            if (description) {
-              const popupDescription = document.createElement("div");
-              popupDescription.className = "text-xs text-slate-500 mt-1";
-              popupDescription.textContent = description;
-              popup.append(popupDescription);
-            }
-            marker.bindPopup(popup);
+          // Añadir marcador en mapa si tiene coordenadas
+          if (rep.lat && rep.lng && !isNaN(Number(rep.lat))) {
+            const customIcon = L.icon({
+              iconUrl: iconUrl,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+              popupAnchor: [0, -14]
+            });
+            const marker = L.marker([Number(rep.lat), Number(rep.lng)], { icon: customIcon }).addTo(map);
+            marker.bindPopup(`
+              <div style="font-size:13px; line-height:1.4;">
+                <strong style="color:#0f2747;">${nombreTipo}</strong><br>
+                <span>${calle}</span><br>
+                ${desc ? `<small style="color:#64748b;">${desc}</small>` : ''}
+              </div>
+            `);
             reportMarkers.push(marker);
           }
-        });
 
-        reports.slice(-5).reverse().forEach((report) => {
-          const item = document.createElement("li");
-          item.className = "rounded-lg bg-slate-50 px-3 py-2";
-          const street = document.createElement("span");
-          street.className = "font-medium text-slate-800";
-          street.textContent = report.calle || report.street || "Ubicación sin nombre";
-          const type = report.tipo || (report.water_level ? "inundacion" : "");
-          const badge = document.createElement("span");
-          badge.className = "ml-2 text-xs font-semibold";
-          badge.style.color = reportTypeColors[type] || "#64748b";
-          badge.textContent = reportTypeLabels[type] || "Reporte";
-          item.append(street, badge);
-          if (report.descripcion) {
-            const desc = document.createElement("p");
-            desc.className = "mt-1 text-xs text-slate-500";
-            desc.textContent = report.descripcion;
-            item.append(desc);
+          // Añadir elemento a la lista del modal
+          const li = document.createElement("li");
+          li.className = "p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition cursor-pointer flex items-start gap-3";
+          li.innerHTML = `
+            <img src="${iconUrl}" class="h-8 w-8 object-contain shrink-0 mt-0.5" alt="${nombreTipo}">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <strong class="text-xs font-bold text-slate-800">${calle}</strong>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  tipo === 'accidente' ? 'bg-amber-100 text-amber-800' :
+                  tipo === 'inundacion' ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800'
+                }">${nombreTipo}</span>
+              </div>
+              ${desc ? `<p class="text-xs text-slate-600 mt-1 line-clamp-2">${desc}</p>` : ''}
+            </div>
+          `;
+
+          // Al hacer clic en un reporte, centrar el mapa en él
+          if (rep.lat && rep.lng) {
+            li.addEventListener("click", () => {
+              closeReportsModal();
+              map.flyTo([Number(rep.lat), Number(rep.lng)], 16);
+            });
           }
-          reportList.append(item);
+
+          listContainer.appendChild(li);
         });
       }
 
       async function loadReports() {
-        const candidates = [];
-        if (JINJA_REPORTS_URL.startsWith("/")) {
-          candidates.push(JINJA_REPORTS_URL);
-        }
-        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
-
+        const candidates = [REPORTS_URL, "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports"];
         for (const url of candidates) {
           try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 2000);
-            const response = await fetch(url, { signal: controller.signal });
+            const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timer);
-            const ct = response.headers.get("content-type") || "";
-            if (response.ok && ct.toLowerCase().includes("json")) {
-              const data = await response.json();
+            if (res.ok) {
+              const data = await res.json();
               if (data && Array.isArray(data.reports)) {
                 renderReports(data.reports);
                 return;
@@ -523,78 +1037,83 @@
             }
           } catch (_) {}
         }
-
-        renderReports(getLocalReports());
+        renderReports(getCachedReports());
       }
 
-      document.getElementById("report-form").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const submitButton = document.getElementById("report-submit");
-        const message = document.getElementById("report-message");
-        const formData = new FormData(form);
-        const street = (formData.get("street") || "").trim();
-        const tipo = formData.get("tipo");
-        const descripcion = (formData.get("descripcion") || "").trim();
-        const lat = formData.get("lat") ? Number(formData.get("lat")) : null;
-        const lng = formData.get("lng") ? Number(formData.get("lng")) : null;
+      // Enviar reporte ciudadano
+      document.getElementById("incident-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const streetInput = document.getElementById("report-street-input");
+        const descInput = document.getElementById("report-desc-input");
+        const typeInput = document.getElementById("report-type-input");
+        const latInput = document.getElementById("report-lat");
+        const lngInput = document.getElementById("report-lng");
+        const feedback = document.getElementById("report-feedback");
+        const submitBtn = document.getElementById("btn-submit-report");
 
-        if (!street || !tipo) return;
+        const street = streetInput.value.trim();
+        const tipo = typeInput.value.trim() || "inundacion";
+        const descripcion = descInput.value.trim();
+        const lat = latInput.value ? Number(latInput.value) : null;
+        const lng = lngInput.value ? Number(lngInput.value) : null;
 
-        submitButton.disabled = true;
-        message.textContent = "Enviando reporte...";
-        message.className = "text-sm text-slate-500";
-
-        const payload = {
-          calle: street,
-          tipo: tipo,
-          descripcion: descripcion,
-          lat: lat,
-          lng: lng
-        };
-
-        const candidates = [];
-        if (JINJA_REPORTS_URL.startsWith("/")) {
-          candidates.push(JINJA_REPORTS_URL);
+        if (!street) {
+          feedback.textContent = "Por favor ingresa la calle o ubicación.";
+          feedback.className = "text-xs font-semibold text-red-600 text-center";
+          return;
         }
-        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
 
+        submitBtn.disabled = true;
+        feedback.textContent = "Enviando tu reporte...";
+        feedback.className = "text-xs font-semibold text-slate-500 text-center";
+
+        const payload = { calle: street, tipo: tipo, descripcion: descripcion, lat: lat, lng: lng };
+
+        // Intentar guardar en backend
+        const candidates = [REPORTS_URL, "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports"];
         for (const url of candidates) {
           try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 3000);
-            const response = await fetch(url, {
+            const res = await fetch(url, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
               signal: controller.signal
             });
             clearTimeout(timer);
-            const ct = response.headers.get("content-type") || "";
-            if (response.ok && ct.toLowerCase().includes("json")) {
-              break;
-            }
+            if (res.ok) break;
           } catch (_) {}
         }
 
+        // Guardar también en caché local
         saveLocalReport(payload);
 
-        message.textContent = "Reporte guardado con éxito. Gracias por contribuir.";
-        message.className = "text-sm text-emerald-700";
-        form.reset();
-        document.getElementById("report-location").textContent =
-          "Opcional: haz clic en el mapa para señalar la ubicación.";
-        document.getElementById("report-lat").value = "";
-        document.getElementById("report-lng").value = "";
+        feedback.textContent = "✓ ¡Reporte registrado de forma inmediata en el mapa!";
+        feedback.className = "text-xs font-bold text-emerald-600 text-center";
+
+        // Resetear campos
+        streetInput.value = "";
+        descInput.value = "";
+        latInput.value = "";
+        lngInput.value = "";
+        document.getElementById("coords-text").textContent = "Haz clic en el mapa para marcar la ubicación exacta (opcional)";
+        document.getElementById("coords-status").className = "text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5";
         if (selectedLocationMarker) {
           map.removeLayer(selectedLocationMarker);
           selectedLocationMarker = null;
         }
+
         await loadReports();
-        submitButton.disabled = false;
+        submitBtn.disabled = false;
+
+        setTimeout(() => {
+          feedback.textContent = "";
+        }, 5000);
       });
 
-      loadStatus();
+      // Inicializar carga de datos
+      loadWeatherAndRisk();
       loadReports();
     </script>
   </body>

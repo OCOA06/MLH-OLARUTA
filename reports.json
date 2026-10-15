@@ -25,5 +25,14 @@
     "lat": 18.6582,
     "lng": -91.802,
     "created_at": "2026-10-15T20:12:30.981000+00:00"
+  },
+  {
+    "id": "58074d95-7249-4c8a-895a-09bb994889c2",
+    "calle": "Av. Isla de Tris",
+    "tipo": "bloqueo",
+    "descripcion": "Cierre vial",
+    "lat": 18.65,
+    "lng": -91.82,
+    "created_at": "2026-10-15T20:38:56.054932+00:00"
   }
 ]
