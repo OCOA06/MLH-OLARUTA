@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rep-001",
+    "timestamp": "2026-10-15T10:15:00-06:00",
+    "author": "Vecino Col. Manigua",
+    "colonia": "Col. La Manigua",
+    "street": "Calle 5 de Mayo esq. Pino Suárez",
+    "coords": [18.6318, -91.8335],
+    "water_level": "Medio (Banqueta rebasada, ~25cm)",
+    "level_code": "medio",
+    "description": "La marea subió y la coladera comenzó a botar agua hacia la calle. El paso peatonal está bloqueado.",
+    "status": "verificado"
+  },
+  {
+    "id": "rep-002",
+    "timestamp": "2026-10-15T11:05:00-06:00",
+    "author": "Comerciante Caleta",
+    "colonia": "La Caleta / Boquerón del Palmar",
+    "street": "Av. Caleta frente al puente peatonal",
+    "coords": [18.6542, -91.8351],
+    "water_level": "Bajo (Encharcamiento leve, <15cm)",
+    "level_code": "bajo",
+    "description": "Encharcamiento en carril derecho dirección centro. Los vehículos reducen velocidad.",
+    "status": "activo"
+  },
+  {
+    "id": "rep-003",
+    "timestamp": "2026-10-15T11:45:00-06:00",
+    "author": "Protección Civil Brigada",
+    "colonia": "Playón / Arroyo de los Franceses",
+    "street": "Calle 47 por calle 28",
+    "coords": [18.6402, -91.8168],
+    "water_level": "Crítico (Nivel rodilla, >40cm)",
+    "level_code": "critico",
+    "description": "Monitoreo preventivo del arroyo. El espejo de agua se encuentra a 15 cm del borde superior de la banqueta.",
+    "status": "en_atencion"
+  }
+]

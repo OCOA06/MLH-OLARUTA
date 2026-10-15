@@ -1,0 +1,101 @@
+[
+  {
+    "id": "manigua",
+    "name": "Col. La Manigua",
+    "coords": [18.6325, -91.8322],
+    "radius_meters": 650,
+    "elevation_masl": 0.6,
+    "vulnerability_factor": 2.2,
+    "drainage_quality": "Bajo (Descarga directa a Laguna de Términos)",
+    "description": "Zona altamente vulnerable por proximidad inmediata a la Laguna de Términos. Susceptible a mareas de tormenta ('nortes') y acumulación de aguas pluviales sin declive natural.",
+    "evacuation_center": "Escuela Primaria Maestros Carmelitas (Av. Concordia)"
+  },
+  {
+    "id": "caracol",
+    "name": "Col. El Caracol",
+    "coords": [18.6438, -91.8290],
+    "radius_meters": 550,
+    "elevation_masl": 0.8,
+    "vulnerability_factor": 2.0,
+    "drainage_quality": "Deficiente (Tapones por sedimentos y basura)",
+    "description": "Terreno bajo con asentamientos cercanos a humedales. Retención de agua prolongada durante lluvias moderadas y continuas.",
+    "evacuation_center": "Gimnasio Polideportivo Revolución"
+  },
+  {
+    "id": "playon_arroyo",
+    "name": "Playón / Arroyo de los Franceses",
+    "coords": [18.6410, -91.8155],
+    "radius_meters": 600,
+    "elevation_masl": 0.7,
+    "vulnerability_factor": 2.1,
+    "drainage_quality": "Crítico (Vaso regulador natural azolvado)",
+    "description": "Corredor natural de escorrentía donde confluyen los escurrimientos del centro hacia el estero. Desbordamiento rápido con precipitaciones > 25 mm.",
+    "evacuation_center": "Centro Social de la Sección 47"
+  },
+  {
+    "id": "caleta",
+    "name": "La Caleta / Boquerón del Palmar",
+    "coords": [18.6535, -91.8360],
+    "radius_meters": 500,
+    "elevation_masl": 0.9,
+    "vulnerability_factor": 1.9,
+    "drainage_quality": "Medio-Bajo (Afectado por pleamar)",
+    "description": "Canal natural intraurbano. Cuando sube la marea alta, el flujo de lluvia se estanca e inunda las calles perimetrales.",
+    "evacuation_center": "Escuela Secundaria Técnica #21"
+  },
+  {
+    "id": "tierra_libertad",
+    "name": "Col. Tierra y Libertad",
+    "coords": [18.6360, -91.8080],
+    "radius_meters": 550,
+    "elevation_masl": 1.0,
+    "vulnerability_factor": 1.8,
+    "drainage_quality": "Deficiente (Falta de red de colectores pluviales)",
+    "description": "Cuenca endorreica urbana sin pendiente suficiente. El agua superficial se estanca durante horas tras episodios de lluvia intensa.",
+    "evacuation_center": "DIF Municipal Carmen (Calle 35)"
+  },
+  {
+    "id": "bivalvo",
+    "name": "Col. Bivalvo / Malecón Costero",
+    "coords": [18.6582, -91.8020],
+    "radius_meters": 700,
+    "elevation_masl": 1.1,
+    "vulnerability_factor": 1.6,
+    "drainage_quality": "Regular (Drenes hacia el Golfo de México)",
+    "description": "Zona costera expuesta a vientos del norte y oleaje. Susceptible a encharcamientos severos en avenidas pavimentadas.",
+    "evacuation_center": "Campus Principal UNACAR"
+  },
+  {
+    "id": "renovacion",
+    "name": "Col. Renovación (I y II)",
+    "coords": [18.6465, -91.7910],
+    "radius_meters": 650,
+    "elevation_masl": 1.0,
+    "vulnerability_factor": 1.7,
+    "drainage_quality": "Bajo (Zanjas a cielo abierto colapsables)",
+    "description": "Zona habitacional extensa en cota baja con canales secundarios que rebasan su capacidad en tormentas tropicales.",
+    "evacuation_center": "Escuela Secundaria General #7"
+  },
+  {
+    "id": "guanal",
+    "name": "Barrio del Guanal",
+    "coords": [18.6415, -91.8385],
+    "radius_meters": 450,
+    "elevation_masl": 1.2,
+    "vulnerability_factor": 1.5,
+    "drainage_quality": "Medio (Salida al estero del Guanal)",
+    "description": "Barrio histórico más antiguo de Carmen. Pendiente leve hacia la dársena, sufre anegaciones en esquinas bajas durante pleamar.",
+    "evacuation_center": "Parroquia de Nuestra Señora del Carmen"
+  },
+  {
+    "id": "centro",
+    "name": "Centro Histórico / Calle 22",
+    "coords": [18.6480, -91.8320],
+    "radius_meters": 500,
+    "elevation_masl": 1.4,
+    "vulnerability_factor": 1.3,
+    "drainage_quality": "Medio (Drenaje antiguo entubado)",
+    "description": "Zona comercial y administrativa. Vulnerabilidad moderada en cruceros clave (Calle 20, 22 y 31) en precipitaciones torrenciales.",
+    "evacuation_center": "Palacio Municipal / Protección Civil"
+  }
+]
