@@ -23,6 +23,14 @@ def handle_api_http_error(error: HTTPException):
         return jsonify({"error": error.description}), error.code
     return error
 
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    return response
+
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 CITY_COORDINATES = {"latitude": 18.6575, "longitude": -91.8325}
 REPORTS_FILE = Path(__file__).resolve().parent / "reports.json"
@@ -190,8 +198,10 @@ def api_status():
     )
 
 
-@app.route("/api/reports", methods=["GET", "POST"])
+@app.route("/api/reports", methods=["GET", "POST", "OPTIONS"])
 def api_reports():
+    if request.method == "OPTIONS":
+        return "", 204
     if request.method == "GET":
         try:
             with REPORTS_LOCK:

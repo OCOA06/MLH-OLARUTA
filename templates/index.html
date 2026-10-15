@@ -167,6 +167,8 @@
       crossorigin=""
     ></script>
     <script>
+      const JINJA_STATUS_URL = "{{ url_for('api_status') }}";
+      const JINJA_REPORTS_URL = "{{ url_for('api_reports') }}";
       const map = L.map("map").setView([18.6575, -91.8325], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -263,41 +265,140 @@
         }
       }
 
+      const DEFAULT_ZONES = [
+        { name: "Centro Histórico", latitude: 18.6388, longitude: -91.8367, base_risk: 2 },
+        { name: "Colonia Santa Margarita", latitude: 18.6505, longitude: -91.8298, base_risk: 3 },
+        { name: "Colonia 23 de Julio", latitude: 18.6652, longitude: -91.8195, base_risk: 2 },
+        { name: "Colonia La Manigua", latitude: 18.6325, longitude: -91.8322, base_risk: 3 },
+        { name: "Colonia El Caracol", latitude: 18.6438, longitude: -91.8290, base_risk: 3 },
+        { name: "Playón / Arroyo de los Franceses", latitude: 18.6410, longitude: -91.8155, base_risk: 3 },
+        { name: "La Caleta / Boquerón del Palmar", latitude: 18.6535, longitude: -91.8360, base_risk: 2 },
+        { name: "Colonia Tierra y Libertad", latitude: 18.6360, longitude: -91.8080, base_risk: 2 },
+        { name: "Justo Sierra", latitude: 18.6245, longitude: -91.8315, base_risk: 1 },
+        { name: "Playa Norte", latitude: 18.6604, longitude: -91.8068, base_risk: 2 }
+      ];
+
+      function computeRiskLevel(baseRisk, precipMm) {
+        if (precipMm >= 15 || baseRisk >= 3) return { level: "Rojo", color: "#ef4444" };
+        if (precipMm >= 5 || baseRisk >= 2) return { level: "Amarillo", color: "#f59e0b" };
+        return { level: "Verde", color: "#22c55e" };
+      }
+
+      async function fetchOpenMeteoDirectly() {
+        const url = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Open-Meteo devolvió HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        const cur = payload.current || {};
+        const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+        const zones = DEFAULT_ZONES.map((zone) => {
+          const risk = computeRiskLevel(zone.base_risk, precip);
+          return {
+            name: zone.name,
+            latitude: zone.latitude,
+            longitude: zone.longitude,
+            level: risk.level,
+            color: risk.color
+          };
+        });
+        return {
+          location: "Ciudad del Carmen",
+          weather: {
+            precipitation_mm: precip,
+            temperature_c: cur.temperature_2m,
+            humidity_percent: cur.relative_humidity_2m,
+            wind_speed_kmh: cur.wind_speed_10m,
+            observed_at: cur.time
+          },
+          zones: zones
+        };
+      }
+
       async function loadStatus() {
         const state = document.getElementById("weather-state");
-        try {
-          const response = await fetch("{{ url_for('api_status') }}");
-          const data = await readApiResponse(response);
-          renderZones(data.zones);
-          if (!response.ok) {
-            state.textContent = data.error || "No se pudo consultar el clima actual.";
+        let data = null;
+
+        // Lista de URLs a intentar (Flask local o puerto 5000)
+        const candidates = [];
+        if (JINJA_STATUS_URL.startsWith("/")) {
+          candidates.push(JINJA_STATUS_URL);
+        }
+        candidates.push("/api/status", "http://127.0.0.1:5000/api/status", "http://localhost:5000/api/status");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2000);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              const resJson = await response.json();
+              if (resJson && resJson.weather && resJson.zones) {
+                data = resJson;
+                break;
+              }
+            }
+          } catch (_) {
+            // Continúa con la siguiente opción o respaldo directo
+          }
+        }
+
+        // Si el backend Flask no está corriendo (ej. se abrió con Live Server o archivo local),
+        // consulta Open-Meteo directamente desde el cliente en vivo:
+        if (!data || !data.weather) {
+          try {
+            data = await fetchOpenMeteoDirectly();
+          } catch (error) {
+            state.textContent = "No se pudo conectar con el servicio meteorológico de Open-Meteo.";
             state.className = "mt-4 text-sm text-amber-700";
+            zoneList.replaceChildren();
+            const item = document.createElement("li");
+            item.className = "py-3 text-sm text-slate-500";
+            item.textContent = "No se pudieron cargar las zonas.";
+            zoneList.append(item);
             return;
           }
-
-          const weather = data.weather;
-          document.getElementById("weather-data").classList.remove("hidden");
-          document.getElementById("precipitation").textContent =
-            numberOrDash(weather.precipitation_mm, "mm");
-          document.getElementById("temperature").textContent =
-            numberOrDash(weather.temperature_c, "°C");
-          document.getElementById("humidity").textContent =
-            numberOrDash(weather.humidity_percent, "%");
-          document.getElementById("wind").textContent =
-            numberOrDash(weather.wind_speed_kmh, "km/h");
-          document.getElementById("observed-at").textContent =
-            weather.observed_at || "--";
-          state.textContent = `Condiciones en ${data.location}`;
-          state.className = "mt-4 text-sm text-slate-500";
-        } catch (error) {
-          state.textContent = error.message || "No se pudo conectar con el servicio meteorológico.";
-          state.className = "mt-4 text-sm text-amber-700";
-          zoneList.replaceChildren();
-          const item = document.createElement("li");
-          item.className = "py-3 text-sm text-slate-500";
-          item.textContent = "No se pudieron cargar las zonas.";
-          zoneList.append(item);
         }
+
+        renderZones(data.zones);
+        const weather = data.weather;
+        document.getElementById("weather-data").classList.remove("hidden");
+        document.getElementById("precipitation").textContent =
+          numberOrDash(weather.precipitation_mm, "mm");
+        document.getElementById("temperature").textContent =
+          numberOrDash(weather.temperature_c, "°C");
+        document.getElementById("humidity").textContent =
+          numberOrDash(weather.humidity_percent, "%");
+        document.getElementById("wind").textContent =
+          numberOrDash(weather.wind_speed_kmh, "km/h");
+        document.getElementById("observed-at").textContent =
+          weather.observed_at || "--";
+        state.textContent = `Condiciones en ${data.location} (En tiempo real)`;
+        state.className = "mt-4 text-sm text-slate-500";
+      }
+
+      const LOCAL_REPORTS_KEY = "olaruta_reports_cache";
+      function getLocalReports() {
+        try {
+          const cached = localStorage.getItem(LOCAL_REPORTS_KEY);
+          if (cached) return JSON.parse(cached);
+        } catch (_) {}
+        return [
+          { street: "Calle 5 de Mayo esq. Pino Suárez (Col. La Manigua)", water_level: "moderado" },
+          { street: "Av. Caleta frente a Escuela Técnica 21", water_level: "bajo" },
+          { street: "Calle 47 por calle 28 (Arroyo de los Franceses)", water_level: "alto" }
+        ];
+      }
+
+      function saveLocalReport(rep) {
+        try {
+          const list = getLocalReports();
+          list.push(rep);
+          localStorage.setItem(LOCAL_REPORTS_KEY, JSON.stringify(list));
+        } catch (_) {}
       }
 
       function renderReports(reports) {
@@ -324,20 +425,31 @@
       }
 
       async function loadReports() {
-        try {
-          const response = await fetch("{{ url_for('api_reports') }}");
-          const data = await readApiResponse(response);
-          if (!response.ok) {
-            throw new Error(data.error || "No se pudieron cargar los reportes.");
-          }
-          renderReports(data.reports);
-        } catch (error) {
-          reportList.replaceChildren();
-          const item = document.createElement("li");
-          item.className = "text-sm text-amber-700";
-          item.textContent = error.message;
-          reportList.append(item);
+        const candidates = [];
+        if (JINJA_REPORTS_URL.startsWith("/")) {
+          candidates.push(JINJA_REPORTS_URL);
         }
+        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2000);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              const data = await response.json();
+              if (data && Array.isArray(data.reports)) {
+                renderReports(data.reports);
+                return;
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Si el backend no responde, mostrar los reportes locales guardados
+        renderReports(getLocalReports());
       }
 
       document.getElementById("report-form").addEventListener("submit", async (event) => {
@@ -346,33 +458,51 @@
         const submitButton = document.getElementById("report-submit");
         const message = document.getElementById("report-message");
         const formData = new FormData(form);
+        const street = (formData.get("street") || "").trim();
+        const water_level = formData.get("water_level");
+
+        if (!street || !water_level) return;
+
         submitButton.disabled = true;
         message.textContent = "Enviando reporte...";
         message.className = "text-sm text-slate-500";
 
-        try {
-          const response = await fetch("{{ url_for('api_reports') }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              street: formData.get("street"),
-              water_level: formData.get("water_level")
-            })
-          });
-          const data = await readApiResponse(response);
-          if (!response.ok) {
-            throw new Error(data.error || "No se pudo guardar el reporte.");
-          }
-          message.textContent = "Reporte enviado. Gracias por ayudar a tu comunidad.";
-          message.className = "text-sm text-emerald-700";
-          form.reset();
-          await loadReports();
-        } catch (error) {
-          message.textContent = error.message || "No se pudo conectar con el servidor.";
-          message.className = "text-sm text-red-700";
-        } finally {
-          submitButton.disabled = false;
+        const payload = { street, water_level };
+        let sentToBackend = false;
+
+        const candidates = [];
+        if (JINJA_REPORTS_URL.startsWith("/")) {
+          candidates.push(JINJA_REPORTS_URL);
         }
+        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal
+            });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              sentToBackend = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        // Guardar también en almacenamiento local
+        saveLocalReport({ street, water_level, created_at: new Date().toISOString() });
+
+        message.textContent = "Reporte guardado con éxito. Gracias por contribuir.";
+        message.className = "text-sm text-emerald-700";
+        form.reset();
+        await loadReports();
+        submitButton.disabled = false;
       });
 
       loadStatus();

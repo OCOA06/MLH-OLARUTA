@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1220">
+    <title>OlaRuta | Monitoreo de Inundaciones - Ciudad del Carmen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    >
+    <style>
+      body { background: #f4f7fb; }
+      #map { min-height: 420px; }
+      .leaflet-container { font: inherit; }
+      @media (min-width: 1024px) {
+        #map { min-height: calc(100vh - 5.5rem); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen text-slate-800 antialiased">
+    <header class="border-b border-slate-200 bg-white shadow-sm">
+      <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6">
+        <a class="flex items-center gap-3" href="/" aria-label="OlaRuta, inicio">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-cyan-600 text-xl text-white shadow-sm" aria-hidden="true">🌊</span>
+          <span>
+            <span class="block text-lg font-bold tracking-tight text-slate-900">OlaRuta</span>
+            <span class="block text-xs text-slate-500">Ciudad del Carmen, Campeche</span>
+          </span>
+        </a>
+        <span class="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+          Monitoreo ciudadano
+        </span>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-screen-2xl p-4 sm:p-6">
+      <div class="mb-5">
+        <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">Centro de monitoreo</p>
+        <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Lluvia y zonas de riesgo</h1>
+        <p class="mt-1 text-sm text-slate-600">Consulta las condiciones actuales y comparte lo que ocurre en tu calle.</p>
+      </div>
+
+      <div class="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside class="space-y-4">
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="weather-heading">
+            <div class="flex items-center justify-between">
+              <h2 id="weather-heading" class="font-semibold text-slate-900">Clima actual</h2>
+              <span class="rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800">Open-Meteo</span>
+            </div>
+            <p id="weather-state" class="mt-4 text-sm text-slate-500" role="status" aria-live="polite">Consultando condiciones...</p>
+            <div id="weather-data" class="mt-4 hidden">
+              <div class="flex items-end gap-2">
+                <span id="precipitation" class="text-4xl font-bold tracking-tight text-slate-950">--</span>
+                <span class="pb-1 text-sm text-slate-500">mm de precipitación</span>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Temperatura</p>
+                  <p id="temperature" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Humedad</p>
+                  <p id="humidity" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Viento</p>
+                  <p id="wind" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Actualizado</p>
+                  <p id="observed-at" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="zones-heading">
+            <div class="flex items-center justify-between">
+              <h2 id="zones-heading" class="font-semibold text-slate-900">Zonas de riesgo</h2>
+              <span class="text-xs text-slate-500">Estimación actual</span>
+            </div>
+            <ul id="zone-list" class="mt-3 divide-y divide-slate-100">
+              <li class="py-3 text-sm text-slate-500">Cargando zonas...</li>
+            </ul>
+            <p class="mt-3 text-xs leading-5 text-slate-500">
+              Niveles orientativos calculados con lluvia actual y riesgo base de cada zona; no sustituyen avisos oficiales.
+            </p>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="report-heading">
+            <h2 id="report-heading" class="font-semibold text-slate-900">Reportar anegamiento</h2>
+            <p class="mt-1 text-sm text-slate-500">Ayuda a tus vecinos compartiendo las condiciones de tu calle.</p>
+            <form id="report-form" class="mt-4 space-y-3">
+              <div>
+                <label for="street" class="mb-1 block text-sm font-medium text-slate-700">Calle o ubicación</label>
+                <input
+                  id="street"
+                  name="street"
+                  type="text"
+                  maxlength="160"
+                  autocomplete="street-address"
+                  required
+                  placeholder="Ej. Calle 31, Centro"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                >
+              </div>
+              <div>
+                <label for="water-level" class="mb-1 block text-sm font-medium text-slate-700">Nivel del agua</label>
+                <select
+                  id="water-level"
+                  name="water_level"
+                  required
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="" disabled selected>Selecciona una opción</option>
+                  <option value="bajo">Bajo — encharcamiento</option>
+                  <option value="moderado">Moderado — dificulta el paso</option>
+                  <option value="alto">Alto — calle inundada</option>
+                </select>
+              </div>
+              <button
+                id="report-submit"
+                type="submit"
+                class="w-full rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Enviar reporte
+              </button>
+              <p id="report-message" class="text-sm" role="status" aria-live="polite"></p>
+            </form>
+            <div class="mt-4 border-t border-slate-100 pt-3">
+              <h3 class="text-sm font-medium text-slate-800">Reportes recientes</h3>
+              <ul id="report-list" class="mt-2 space-y-2 text-sm text-slate-600">
+                <li>Cargando reportes...</li>
+              </ul>
+            </div>
+          </section>
+        </aside>
+
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Mapa de zonas de riesgo">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div>
+              <h2 class="font-semibold text-slate-900">Mapa de Ciudad del Carmen</h2>
+              <p class="text-xs text-slate-500">Selecciona un marcador para ver el nivel de riesgo</p>
+            </div>
+            <div class="flex gap-3 text-xs font-medium text-slate-600" aria-label="Leyenda del mapa">
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-green-500"></i>Verde</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-amber-500"></i>Amarillo</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-500"></i>Rojo</span>
+            </div>
+          </div>
+          <div id="map" role="application" aria-label="Mapa interactivo con las zonas de riesgo"></div>
+          <div class="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+            Mapa © OpenStreetMap contributors · Niveles de riesgo orientativos
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script>
+      const JINJA_STATUS_URL = "{{ url_for('api_status') }}";
+      const JINJA_REPORTS_URL = "{{ url_for('api_reports') }}";
+      const map = L.map("map").setView([18.6575, -91.8325], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      const markers = [];
+      const zoneList = document.getElementById("zone-list");
+      const reportList = document.getElementById("report-list");
+      const numberOrDash = (value, unit) =>
+        typeof value === "number" ? `${value.toFixed(1)} ${unit}` : "--";
+
+      async function readApiResponse(response) {
+        const contentType = response.headers.get("content-type") || "";
+        const body = await response.text();
+        if (!body.trim()) {
+          throw new Error(
+            response.ok
+              ? "El servidor devolvió una respuesta vacía."
+              : `El servidor respondió con el error ${response.status} sin detalles.`
+          );
+        }
+        if (!contentType.toLowerCase().includes("json")) {
+          if (response.status === 404) {
+            throw new Error(
+              "La ruta de la API devolvió 404. Abre OlaRuta desde Flask en " +
+              "http://127.0.0.1:5000 (no con Live Server) y vuelve a cargar la página."
+            );
+          }
+          throw new Error(
+            `La API devolvió una respuesta que no es JSON (HTTP ${response.status}). ` +
+            "Comprueba que la aplicación Flask esté ejecutándose y que la URL sea correcta."
+          );
+        }
+        try {
+          return JSON.parse(body);
+        } catch {
+          throw new Error("La API devolvió JSON inválido.");
+        }
+      }
+
+      function renderZones(zones) {
+        zoneList.replaceChildren();
+        markers.forEach((marker) => map.removeLayer(marker));
+        markers.length = 0;
+
+        if (!Array.isArray(zones) || zones.length === 0) {
+          const item = document.createElement("li");
+          item.className = "py-3 text-sm text-slate-500";
+          item.textContent = "No hay zonas disponibles.";
+          zoneList.append(item);
+          return;
+        }
+
+        zones.forEach((zone) => {
+          const item = document.createElement("li");
+          item.className = "flex items-center justify-between gap-3 py-3";
+
+          const name = document.createElement("span");
+          name.className = "text-sm font-medium text-slate-700";
+          name.textContent = zone.name;
+
+          const level = document.createElement("span");
+          level.className = "inline-flex items-center gap-2 text-sm font-semibold";
+          level.style.color = zone.color;
+          const dot = document.createElement("i");
+          dot.className = "h-2.5 w-2.5 rounded-full";
+          dot.style.backgroundColor = zone.color;
+          const label = document.createElement("span");
+          label.textContent = zone.level;
+          level.append(dot, label);
+          item.append(name, level);
+          zoneList.append(item);
+
+          const marker = L.circleMarker([zone.latitude, zone.longitude], {
+            radius: 9,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: zone.color,
+            fillOpacity: 0.95
+          }).addTo(map);
+          const popup = document.createElement("div");
+          const popupName = document.createElement("strong");
+          popupName.textContent = zone.name;
+          const popupLevel = document.createElement("div");
+          popupLevel.textContent = `Riesgo: ${zone.level}`;
+          popup.append(popupName, popupLevel);
+          marker.bindPopup(popup);
+          markers.push(marker);
+        });
+
+        if (markers.length) {
+          map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
+        }
+      }
+
+      const DEFAULT_ZONES = [
+        { name: "Centro Histórico", latitude: 18.6388, longitude: -91.8367, base_risk: 2 },
+        { name: "Colonia Santa Margarita", latitude: 18.6505, longitude: -91.8298, base_risk: 3 },
+        { name: "Colonia 23 de Julio", latitude: 18.6652, longitude: -91.8195, base_risk: 2 },
+        { name: "Colonia La Manigua", latitude: 18.6325, longitude: -91.8322, base_risk: 3 },
+        { name: "Colonia El Caracol", latitude: 18.6438, longitude: -91.8290, base_risk: 3 },
+        { name: "Playón / Arroyo de los Franceses", latitude: 18.6410, longitude: -91.8155, base_risk: 3 },
+        { name: "La Caleta / Boquerón del Palmar", latitude: 18.6535, longitude: -91.8360, base_risk: 2 },
+        { name: "Colonia Tierra y Libertad", latitude: 18.6360, longitude: -91.8080, base_risk: 2 },
+        { name: "Justo Sierra", latitude: 18.6245, longitude: -91.8315, base_risk: 1 },
+        { name: "Playa Norte", latitude: 18.6604, longitude: -91.8068, base_risk: 2 }
+      ];
+
+      function computeRiskLevel(baseRisk, precipMm) {
+        if (precipMm >= 15 || baseRisk >= 3) return { level: "Rojo", color: "#ef4444" };
+        if (precipMm >= 5 || baseRisk >= 2) return { level: "Amarillo", color: "#f59e0b" };
+        return { level: "Verde", color: "#22c55e" };
+      }
+
+      async function fetchOpenMeteoDirectly() {
+        const url = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Open-Meteo devolvió HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        const cur = payload.current || {};
+        const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+        const zones = DEFAULT_ZONES.map((zone) => {
+          const risk = computeRiskLevel(zone.base_risk, precip);
+          return {
+            name: zone.name,
+            latitude: zone.latitude,
+            longitude: zone.longitude,
+            level: risk.level,
+            color: risk.color
+          };
+        });
+        return {
+          location: "Ciudad del Carmen",
+          weather: {
+            precipitation_mm: precip,
+            temperature_c: cur.temperature_2m,
+            humidity_percent: cur.relative_humidity_2m,
+            wind_speed_kmh: cur.wind_speed_10m,
+            observed_at: cur.time
+          },
+          zones: zones
+        };
+      }
+
+      async function loadStatus() {
+        const state = document.getElementById("weather-state");
+        let data = null;
+
+        // Lista de URLs a intentar (Flask local o puerto 5000)
+        const candidates = [];
+        if (JINJA_STATUS_URL.startsWith("/")) {
+          candidates.push(JINJA_STATUS_URL);
+        }
+        candidates.push("/api/status", "http://127.0.0.1:5000/api/status", "http://localhost:5000/api/status");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2000);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              const resJson = await response.json();
+              if (resJson && resJson.weather && resJson.zones) {
+                data = resJson;
+                break;
+              }
+            }
+          } catch (_) {
+            // Continúa con la siguiente opción o respaldo directo
+          }
+        }
+
+        // Si el backend Flask no está corriendo (ej. se abrió con Live Server o archivo local),
+        // consulta Open-Meteo directamente desde el cliente en vivo:
+        if (!data || !data.weather) {
+          try {
+            data = await fetchOpenMeteoDirectly();
+          } catch (error) {
+            state.textContent = "No se pudo conectar con el servicio meteorológico de Open-Meteo.";
+            state.className = "mt-4 text-sm text-amber-700";
+            zoneList.replaceChildren();
+            const item = document.createElement("li");
+            item.className = "py-3 text-sm text-slate-500";
+            item.textContent = "No se pudieron cargar las zonas.";
+            zoneList.append(item);
+            return;
+          }
+        }
+
+        renderZones(data.zones);
+        const weather = data.weather;
+        document.getElementById("weather-data").classList.remove("hidden");
+        document.getElementById("precipitation").textContent =
+          numberOrDash(weather.precipitation_mm, "mm");
+        document.getElementById("temperature").textContent =
+          numberOrDash(weather.temperature_c, "°C");
+        document.getElementById("humidity").textContent =
+          numberOrDash(weather.humidity_percent, "%");
+        document.getElementById("wind").textContent =
+          numberOrDash(weather.wind_speed_kmh, "km/h");
+        document.getElementById("observed-at").textContent =
+          weather.observed_at || "--";
+        state.textContent = `Condiciones en ${data.location} (En tiempo real)`;
+        state.className = "mt-4 text-sm text-slate-500";
+      }
+
+      const LOCAL_REPORTS_KEY = "olaruta_reports_cache";
+      function getLocalReports() {
+        try {
+          const cached = localStorage.getItem(LOCAL_REPORTS_KEY);
+          if (cached) return JSON.parse(cached);
+        } catch (_) {}
+        return [
+          { street: "Calle 5 de Mayo esq. Pino Suárez (Col. La Manigua)", water_level: "moderado" },
+          { street: "Av. Caleta frente a Escuela Técnica 21", water_level: "bajo" },
+          { street: "Calle 47 por calle 28 (Arroyo de los Franceses)", water_level: "alto" }
+        ];
+      }
+
+      function saveLocalReport(rep) {
+        try {
+          const list = getLocalReports();
+          list.push(rep);
+          localStorage.setItem(LOCAL_REPORTS_KEY, JSON.stringify(list));
+        } catch (_) {}
+      }
+
+      function renderReports(reports) {
+        reportList.replaceChildren();
+        if (!reports.length) {
+          const item = document.createElement("li");
+          item.textContent = "Aún no hay reportes.";
+          reportList.append(item);
+          return;
+        }
+
+        reports.slice(-5).reverse().forEach((report) => {
+          const item = document.createElement("li");
+          item.className = "rounded-lg bg-slate-50 px-3 py-2";
+          const street = document.createElement("span");
+          street.className = "font-medium text-slate-800";
+          street.textContent = report.street;
+          const level = document.createElement("span");
+          level.className = "ml-2 text-xs capitalize text-slate-500";
+          level.textContent = report.water_level;
+          item.append(street, level);
+          reportList.append(item);
+        });
+      }
+
+      async function loadReports() {
+        const candidates = [];
+        if (JINJA_REPORTS_URL.startsWith("/")) {
+          candidates.push(JINJA_REPORTS_URL);
+        }
+        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2000);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              const data = await response.json();
+              if (data && Array.isArray(data.reports)) {
+                renderReports(data.reports);
+                return;
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Si el backend no responde, mostrar los reportes locales guardados
+        renderReports(getLocalReports());
+      }
+
+      document.getElementById("report-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submitButton = document.getElementById("report-submit");
+        const message = document.getElementById("report-message");
+        const formData = new FormData(form);
+        const street = (formData.get("street") || "").trim();
+        const water_level = formData.get("water_level");
+
+        if (!street || !water_level) return;
+
+        submitButton.disabled = true;
+        message.textContent = "Enviando reporte...";
+        message.className = "text-sm text-slate-500";
+
+        const payload = { street, water_level };
+        let sentToBackend = false;
+
+        const candidates = [];
+        if (JINJA_REPORTS_URL.startsWith("/")) {
+          candidates.push(JINJA_REPORTS_URL);
+        }
+        candidates.push("/api/reports", "http://127.0.0.1:5000/api/reports", "http://localhost:5000/api/reports");
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal
+            });
+            clearTimeout(timer);
+            const ct = response.headers.get("content-type") || "";
+            if (response.ok && ct.toLowerCase().includes("json")) {
+              sentToBackend = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        // Guardar también en almacenamiento local
+        saveLocalReport({ street, water_level, created_at: new Date().toISOString() });
+
+        message.textContent = "Reporte guardado con éxito. Gracias por contribuir.";
+        message.className = "text-sm text-emerald-700";
+        form.reset();
+        await loadReports();
+        submitButton.disabled = false;
+      });
+
+      loadStatus();
+      loadReports();
+    </script>
+  </body>
+</html>
