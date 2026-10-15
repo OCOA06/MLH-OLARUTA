@@ -69,3 +69,10 @@ Abre tu navegador en:
 
 ## 👥 Equipo OlaRuta
 Desarrollado para el Hackathon **MLH OLARUTA**.
+
+---
+
+## 🏆 Entrega Final
+- **Versión**: 1.0.0 — Entrega Final
+- **Estado**: Completo, verificado y operativo (Soporte dual: Backend Flask y modo estático / Live Server)
+- **Repositorio oficial**: [https://github.com/OCOA06/MLH-OLARUTA](https://github.com/OCOA06/MLH-OLARUTA)
