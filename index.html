@@ -146,7 +146,7 @@
     <header class="bg-[#07162c] text-white shadow-md sticky top-0 z-40 select-none">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
         
-        <!-- Icono Oficial Circular Resplandeciente (OR) sin texto extra para coincidir al 100% con mockup -->
+        <!-- Icono Oficial Circular Resplandeciente (OR) -->
         <a href="/" class="flex items-center group" aria-label="Inicio OlaRuta">
           <img
             id="nav-icon"
@@ -227,7 +227,9 @@
             <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping"></span>
             <h2 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700">Mapa Satelital / Vial</h2>
           </div>
-          <div class="flex items-center gap-2.5 text-xs font-semibold text-slate-600">
+          
+          <!-- PUNTOS INDICADORES DE RIESGO: OCULTOS POR DEFECTO, SOLO VISIBLES EN PREDICCIÓN -->
+          <div id="map-risk-legend" class="hidden items-center gap-2.5 text-xs font-semibold text-slate-600 transition-all">
             <span class="flex items-center gap-1"><i class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></i>Bajo</span>
             <span class="flex items-center gap-1"><i class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></i>Medio</span>
             <span class="flex items-center gap-1"><i class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></i>Alto</span>
@@ -238,7 +240,7 @@
         <div id="map" class="shadow-inner" role="application" aria-label="Mapa de Ciudad del Carmen"></div>
 
         <div class="mt-3 px-2 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
-          <span id="map-hint">📍 Haz clic en el mapa para marcar la ubicación de tu reporte</span>
+          <span id="map-hint">📍 Haz clic en cualquier punto del mapa para autodetectar la calle</span>
           <span>© OpenStreetMap · Open-Meteo</span>
         </div>
       </section>
@@ -336,18 +338,21 @@
               <!-- Campos de Calle y Descripción -->
               <div class="space-y-2 mt-3">
                 <div>
-                  <label for="report-street-input" class="block text-xs font-semibold text-slate-600 mb-1">
-                    Calle o Referencia *
+                  <label for="report-street-input" class="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
+                    <span>Calle o Referencia *</span>
+                    <span id="geo-status-indicator" class="text-[10px] font-normal text-cyan-700 hidden">🔍 Detectando dirección...</span>
                   </label>
-                  <input
-                    type="text"
-                    id="report-street-input"
-                    name="calle"
-                    required
-                    maxlength="160"
-                    placeholder="Ej. Calle 35 por 56, Col. Benito Juárez"
-                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition"
-                  >
+                  <div class="relative">
+                    <input
+                      type="text"
+                      id="report-street-input"
+                      name="calle"
+                      required
+                      maxlength="160"
+                      placeholder="Ej. Calle 35 por 56, Col. Benito Juárez"
+                      class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition"
+                    >
+                  </div>
                 </div>
 
                 <div>
@@ -366,7 +371,7 @@
 
                 <div id="coords-status" class="text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5">
                   <span>📍</span>
-                  <span id="coords-text">Haz clic en el mapa para marcar la ubicación exacta (opcional)</span>
+                  <span id="coords-text">Haz clic en el mapa para situar y autodetectar la dirección</span>
                 </div>
               </div>
 
@@ -702,7 +707,93 @@
 
       let selectedLocationMarker = null;
 
-      // Evento de clic en el mapa para situar incidente
+      // Puntos de referencia conocidos en Ciudad del Carmen (fallback de geocodificación inversa)
+      const CARMEN_LANDMARKS = [
+        { name: "Av. Isla de Tris, Plaza Palmira", lat: 18.6550, lng: -91.7900 },
+        { name: "Calle 31, Centro Histórico", lat: 18.6388, lng: -91.8367 },
+        { name: "Av. Concordia con Calle 56", lat: 18.6438, lng: -91.8290 },
+        { name: "Malecón Costero, Playa Norte", lat: 18.6604, lng: -91.8068 },
+        { name: "Colonia 23 de Julio", lat: 18.6652, lng: -91.8195 },
+        { name: "Colonia Santa Margarita", lat: 18.6505, lng: -91.8298 },
+        { name: "Colonia La Manigua", lat: 18.6325, lng: -91.8322 },
+        { name: "Av. Aviación cerca del Aeropuerto", lat: 18.6530, lng: -91.8010 },
+        { name: "Colonia San Nicolás", lat: 18.6540, lng: -91.8150 },
+        { name: "Colonia Justo Sierra", lat: 18.6245, lng: -91.8315 },
+        { name: "Arroyo de los Franceses / Playón", lat: 18.6410, lng: -91.8155 },
+        { name: "La Caleta / Boquerón del Palmar", lat: 18.6535, lng: -91.8360 },
+        { name: "Glorieta del Camarón", lat: 18.6465, lng: -91.8250 }
+      ];
+
+      function getNearestLandmark(lat, lng) {
+        let bestDist = Infinity;
+        let bestName = "";
+        for (const lm of CARMEN_LANDMARKS) {
+          const d = Math.hypot(lat - lm.lat, lng - lm.lng);
+          if (d < bestDist) {
+            bestDist = d;
+            bestName = lm.name;
+          }
+        }
+        return bestName;
+      }
+
+      // Geocodificación inversa con detección automática de calle
+      async function detectStreetAddress(lat, lng) {
+        const geoIndicator = document.getElementById("geo-status-indicator");
+        const streetInput = document.getElementById("report-street-input");
+
+        geoIndicator.classList.remove("hidden");
+        streetInput.placeholder = "Detectando dirección...";
+
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3500);
+          const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timer);
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.address) {
+              const a = data.address;
+              const road = a.road || a.pedestrian || a.street || a.highway || a.path;
+              const area = a.suburb || a.neighbourhood || a.residential || a.quarter || a.hamlet;
+
+              let detected = "";
+              if (road && area) {
+                detected = `${road}, ${area}`;
+              } else if (road) {
+                detected = `${road}`;
+              } else if (area) {
+                detected = `${area}, Ciudad del Carmen`;
+              } else if (data.name) {
+                detected = `${data.name}`;
+              } else if (data.display_name) {
+                detected = data.display_name.split(",").slice(0, 2).join(",").trim();
+              }
+
+              if (detected) {
+                streetInput.value = detected;
+                geoIndicator.classList.add("hidden");
+                if (selectedLocationMarker) {
+                  selectedLocationMarker.bindPopup(`<strong>${detected}</strong><br><span style="font-size:11px; color:#0284c7;">✓ Dirección autodetectada</span>`).openPopup();
+                }
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+
+        // Fallback a punto de referencia cercano si la API externa tarda o no responde
+        const fallbackName = getNearestLandmark(lat, lng);
+        streetInput.value = fallbackName || `Ubicación ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        geoIndicator.classList.add("hidden");
+        if (selectedLocationMarker) {
+          selectedLocationMarker.bindPopup(`<strong>${streetInput.value}</strong><br><span style="font-size:11px; color:#0284c7;">Ubicación estimada</span>`).openPopup();
+        }
+      }
+
+      // Evento de clic en el mapa para situar incidente y autollenar dirección
       map.on("click", (event) => {
         const { lat, lng } = event.latlng;
         document.getElementById("report-lat").value = lat.toFixed(6);
@@ -717,7 +808,10 @@
         } else {
           selectedLocationMarker = L.marker(event.latlng, { icon: olarutaPinIcon }).addTo(map);
         }
-        selectedLocationMarker.bindPopup("<strong>Ubicación de tu reporte</strong><br>Listo para registrar").openPopup();
+        selectedLocationMarker.bindPopup("<strong>Detectando dirección...</strong>").openPopup();
+
+        // Autocompletar el campo de Calle / Dirección
+        detectStreetAddress(lat, lng);
       });
 
       // 2. Manejo de selección de categorías (Accidente, Inundación, Cierre/Bloqueo)
@@ -750,16 +844,42 @@
       const screenReport = document.getElementById("screen-report");
       const screenForecast = document.getElementById("screen-forecast");
       const modalPrediction = document.getElementById("modal-prediction");
+      const mapRiskLegend = document.getElementById("map-risk-legend");
+
+      // Control de visibilidad de indicadores y zonas de riesgo:
+      // SOLO SE MUESTRAN AL DARLE AL BOTÓN DE PREDICCIÓN
+      function toggleRiskIndicators(show) {
+        if (show) {
+          // Mostrar puntos indicadores arriba del mapa
+          mapRiskLegend.classList.remove("hidden");
+          mapRiskLegend.classList.add("flex");
+          // Agregar círculos de riesgo al mapa
+          zoneMarkers.forEach(m => {
+            if (!map.hasLayer(m)) m.addTo(map);
+          });
+        } else {
+          // Ocultar puntos indicadores arriba del mapa
+          mapRiskLegend.classList.add("hidden");
+          mapRiskLegend.classList.remove("flex");
+          // Quitar círculos de riesgo del mapa (deja el mapa limpio para reportar)
+          zoneMarkers.forEach(m => {
+            if (map.hasLayer(m)) map.removeLayer(m);
+          });
+        }
+      }
 
       function showScreen(name) {
         if (name === "forecast") {
           screenReport.classList.add("hidden");
           screenForecast.classList.remove("hidden");
+          // MOSTRAR INDICADORES Y PUNTOS DE COLOR EN PREDICCIÓN
+          toggleRiskIndicators(true);
         } else {
           screenForecast.classList.add("hidden");
           screenReport.classList.remove("hidden");
+          // OCULTAR INDICADORES Y PUNTOS DE COLOR EN PANTALLA DE REPORTE
+          toggleRiskIndicators(false);
         }
-        // Forzar actualización del tamaño del mapa tras el cambio de pestaña
         setTimeout(() => map.invalidateSize(), 150);
       }
 
@@ -804,7 +924,7 @@
         selectIncidentType("inundacion");
         document.getElementById("report-lat").value = "";
         document.getElementById("report-lng").value = "";
-        document.getElementById("coords-text").textContent = "Haz clic en el mapa para marcar la ubicación exacta (opcional)";
+        document.getElementById("coords-text").textContent = "Haz clic en el mapa para situar y autodetectar la dirección";
         document.getElementById("coords-status").className = "text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5";
         if (selectedLocationMarker) {
           map.removeLayer(selectedLocationMarker);
@@ -885,7 +1005,9 @@
       }
 
       function updateRiskZonesUI(zones) {
-        zoneMarkers.forEach((m) => map.removeLayer(m));
+        zoneMarkers.forEach((m) => {
+          if (map.hasLayer(m)) map.removeLayer(m);
+        });
         zoneMarkers.length = 0;
 
         const altoList = [];
@@ -906,10 +1028,15 @@
             weight: 2,
             fillColor: markerColor,
             fillOpacity: 0.85
-          }).addTo(map);
+          });
 
           marker.bindPopup(`<strong>${z.name}</strong><br>Nivel de Riesgo: <span style="color:${markerColor}; font-weight:bold;">${z.level}</span>`);
           zoneMarkers.push(marker);
+
+          // Si actualmente estamos en la pantalla de pronóstico, añadirlo al mapa
+          if (!screenForecast.classList.contains("hidden")) {
+            marker.addTo(map);
+          }
         });
 
         if (altoList.length) document.getElementById("risk-alto-text").textContent = altoList.slice(0, 3).join(", ");
@@ -1172,7 +1299,7 @@
         descInput.value = "";
         latInput.value = "";
         lngInput.value = "";
-        document.getElementById("coords-text").textContent = "Haz clic en el mapa para marcar la ubicación exacta (opcional)";
+        document.getElementById("coords-text").textContent = "Haz clic en el mapa para situar y autodetectar la dirección";
         document.getElementById("coords-status").className = "text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5";
         if (selectedLocationMarker) {
           map.removeLayer(selectedLocationMarker);
