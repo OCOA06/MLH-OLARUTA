@@ -1,329 +1,382 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ALERTA CARMEN — Sistema de Alerta Temprana de Inundaciones</title>
-  
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-  <div class="app-container">
-    
-    <!-- Barra Superior / Header -->
-    <header class="app-header">
-      <div class="header-brand">
-        <div class="brand-badge">
-          <span class="live-dot"></span>
-          <span>TIEMPO REAL</span>
-        </div>
-        <div class="brand-title-group">
-          <h1>ALERTA CARMEN</h1>
-          <span class="brand-sub">Sistema de Alerta Temprana de Inundaciones · Cd. del Carmen, Campeche</span>
-        </div>
-      </div>
-
-      <!-- Semáforo Global y Clima en Vivo -->
-      <div class="header-metrics">
-        <div class="metric-card overall-risk-card" id="overallRiskCard">
-          <span class="metric-label">SEMÁFORO ISLA</span>
-          <div class="risk-badge-large" id="overallRiskBadge">
-            <span class="risk-indicator" id="overallRiskDot"></span>
-            <span id="overallRiskText">Cargando...</span>
-          </div>
-        </div>
-
-        <div class="metric-card">
-          <span class="metric-label">TEMP / LLUVIA HOY</span>
-          <div class="metric-value" id="currentWeatherText">--°C | -- mm</div>
-        </div>
-
-        <div class="metric-card">
-          <span class="metric-label">PROB. LLUVIA 24H</span>
-          <div class="metric-value highlight" id="rainProbText">--%</div>
-        </div>
-
-        <button class="btn-pitch" id="openPitchBtn" title="Ver resumen de arquitectura y pitch">
-          <span>🎯</span> Pitch
-        </button>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1220">
+    <title>HydroAlert | Ciudad del Carmen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    >
+    <style>
+      body { background: #f4f7fb; }
+      #map { min-height: 420px; }
+      .leaflet-container { font: inherit; }
+      @media (min-width: 1024px) {
+        #map { min-height: calc(100vh - 5.5rem); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen text-slate-800 antialiased">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6">
+        <a class="flex items-center gap-3" href="/" aria-label="HydroAlert, inicio">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-cyan-600 text-xl text-white" aria-hidden="true">⌁</span>
+          <span>
+            <span class="block text-lg font-bold tracking-tight text-slate-900">HydroAlert</span>
+            <span class="block text-xs text-slate-500">Ciudad del Carmen, Campeche</span>
+          </span>
+        </a>
+        <span class="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+          Monitoreo ciudadano
+        </span>
       </div>
     </header>
 
-    <!-- Barra de Simulación Interactiva (Para Hackathon / Jueces) -->
-    <div class="sim-banner">
-      <div class="sim-title">
-        <span class="sim-icon">⚡</span>
-        <strong>Simulador de Escenarios (Modo Jurado):</strong>
+    <main class="mx-auto max-w-screen-2xl p-4 sm:p-6">
+      <div class="mb-5">
+        <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">Centro de monitoreo</p>
+        <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Lluvia y zonas de riesgo</h1>
+        <p class="mt-1 text-sm text-slate-600">Consulta las condiciones actuales y comparte lo que ocurre en tu calle.</p>
       </div>
-      <div class="sim-slider-container">
-        <label for="rainSlider">Lluvia simulada: <strong id="simRainValue">Tiempo Real</strong></label>
-        <input type="range" id="rainSlider" min="0" max="80" step="5" value="0">
-      </div>
-      <div class="sim-quick-presets">
-        <button class="btn-preset active" data-rain="real">🌦️ Real</button>
-        <button class="btn-preset" data-rain="10">🟢 Ligera (10mm)</button>
-        <button class="btn-preset" data-rain="30">🟡 Fuerte (30mm)</button>
-        <button class="btn-preset" data-rain="65">🔴 Tormenta (65mm)</button>
-      </div>
-    </div>
 
-    <!-- Contenido Principal (Mapa + Panel Lateral) -->
-    <main class="main-workspace">
-      
-      <!-- Contenedor del Mapa Leaflet -->
-      <section class="map-section">
-        <div id="map"></div>
-
-        <!-- Leyenda Flotante -->
-        <div class="map-floating-legend">
-          <div class="legend-header">Nivel de Riesgo Hidrológico</div>
-          <div class="legend-item"><span class="legend-dot green"></span> Verde: Riesgo Bajo / Normal (&lt;18mm)</div>
-          <div class="legend-item"><span class="legend-dot yellow"></span> Amarillo: Precaución / Encharques (18-45mm)</div>
-          <div class="legend-item"><span class="legend-dot red"></span> Rojo: Crítico / Inundación (&gt;45mm)</div>
-          <div class="legend-item"><span class="legend-icon-pin">📍</span> Reporte de Ciudadano</div>
-        </div>
-
-        <!-- Hint de ayuda en el mapa -->
-        <div class="map-action-hint">
-          💡 <em>Haz clic en cualquier punto del mapa para reportar una anegación en esa ubicación exacta.</em>
-        </div>
-      </section>
-
-      <!-- Panel Lateral con Pestañas -->
-      <aside class="sidebar-panel">
-        <nav class="sidebar-tabs">
-          <button class="tab-btn active" data-tab="tab-zones">
-            <span>🗺️ Zonas de Riesgo (<span id="zonesCount">0</span>)</span>
-          </button>
-          <button class="tab-btn" data-tab="tab-reports">
-            <span>📢 Reportes (<span id="reportsCount">0</span>)</span>
-          </button>
-          <button class="tab-btn" data-tab="tab-ai">
-            <span>🤖 Boletín IA (Gemma)</span>
-          </button>
-          <button class="tab-btn" data-tab="tab-history">
-            <span>📊 NASA POWER</span>
-          </button>
-        </nav>
-
-        <div class="sidebar-content">
-          
-          <!-- Pestaña 1: Zonas de Riesgo y Semáforo -->
-          <div class="tab-pane active" id="tab-zones">
-            <div class="pane-header">
-              <h3>Vulnerabilidad por Colonias</h3>
-              <p class="pane-desc">Cálculo en tiempo real cruzando pronóstico de Open-Meteo con cota de elevación y cercanía al mar/laguna.</p>
+      <div class="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside class="space-y-4">
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="weather-heading">
+            <div class="flex items-center justify-between">
+              <h2 id="weather-heading" class="font-semibold text-slate-900">Clima actual</h2>
+              <span class="rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800">Open-Meteo</span>
             </div>
-            
-            <div class="zones-summary-bar">
-              <span class="badge-count green" id="greenCount">0 Verdes</span>
-              <span class="badge-count yellow" id="yellowCount">0 Amarillos</span>
-              <span class="badge-count red" id="redCount">0 Rojos</span>
+            <p id="weather-state" class="mt-4 text-sm text-slate-500" role="status" aria-live="polite">Consultando condiciones...</p>
+            <div id="weather-data" class="mt-4 hidden">
+              <div class="flex items-end gap-2">
+                <span id="precipitation" class="text-4xl font-bold tracking-tight text-slate-950">--</span>
+                <span class="pb-1 text-sm text-slate-500">mm de precipitación</span>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Temperatura</p>
+                  <p id="temperature" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Humedad</p>
+                  <p id="humidity" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Viento</p>
+                  <p id="wind" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Actualizado</p>
+                  <p id="observed-at" class="mt-1 font-semibold text-slate-800">--</p>
+                </div>
+              </div>
             </div>
+          </section>
 
-            <div class="zones-list" id="zonesList">
-              <div class="loading-state">Cargando colonias de Ciudad del Carmen...</div>
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="zones-heading">
+            <div class="flex items-center justify-between">
+              <h2 id="zones-heading" class="font-semibold text-slate-900">Zonas de riesgo</h2>
+              <span class="text-xs text-slate-500">Estimación actual</span>
             </div>
-          </div>
+            <ul id="zone-list" class="mt-3 divide-y divide-slate-100">
+              <li class="py-3 text-sm text-slate-500">Cargando zonas...</li>
+            </ul>
+            <p class="mt-3 text-xs leading-5 text-slate-500">
+              Niveles orientativos calculados con lluvia actual y riesgo base de cada zona; no sustituyen avisos oficiales.
+            </p>
+          </section>
 
-          <!-- Pestaña 2: Reporte Ciudadano -->
-          <div class="tab-pane" id="tab-reports">
-            <div class="pane-header">
-              <h3>Reporte Ciudadano en Tiempo Real</h3>
-              <p class="pane-desc">Colaboración comunitaria para validar anegaciones sobre el terreno.</p>
-            </div>
-
-            <form id="citizenReportForm" class="citizen-form">
-              <div class="form-group">
-                <label for="repColonia">Colonia / Sector</label>
-                <select id="repColonia" required>
-                  <option value="">Selecciona una colonia...</option>
-                  <option value="Col. La Manigua">Col. La Manigua</option>
-                  <option value="Col. El Caracol">Col. El Caracol</option>
-                  <option value="Playón / Arroyo de los Franceses">Playón / Arroyo de los Franceses</option>
-                  <option value="La Caleta / Boquerón del Palmar">La Caleta / Boquerón del Palmar</option>
-                  <option value="Col. Tierra y Libertad">Col. Tierra y Libertad</option>
-                  <option value="Col. Bivalvo / Malecón Costero">Col. Bivalvo / Malecón Costero</option>
-                  <option value="Col. Renovación (I y II)">Col. Renovación (I y II)</option>
-                  <option value="Barrio del Guanal">Barrio del Guanal</option>
-                  <option value="Centro Histórico / Calle 22">Centro Histórico / Calle 22</option>
-                  <option value="Otra zona de Carmen">Otra zona de Carmen</option>
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="report-heading">
+            <h2 id="report-heading" class="font-semibold text-slate-900">Reportar anegamiento</h2>
+            <p class="mt-1 text-sm text-slate-500">Ayuda a tus vecinos compartiendo las condiciones de tu calle.</p>
+            <form id="report-form" class="mt-4 space-y-3">
+              <div>
+                <label for="street" class="mb-1 block text-sm font-medium text-slate-700">Calle o ubicación</label>
+                <input
+                  id="street"
+                  name="street"
+                  type="text"
+                  maxlength="160"
+                  autocomplete="street-address"
+                  required
+                  placeholder="Ej. Calle 31, Centro"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                >
+              </div>
+              <div>
+                <label for="water-level" class="mb-1 block text-sm font-medium text-slate-700">Nivel del agua</label>
+                <select
+                  id="water-level"
+                  name="water_level"
+                  required
+                  class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="" disabled selected>Selecciona una opción</option>
+                  <option value="bajo">Bajo — encharcamiento</option>
+                  <option value="moderado">Moderado — dificulta el paso</option>
+                  <option value="alto">Alto — calle inundada</option>
                 </select>
               </div>
-
-              <div class="form-group">
-                <label for="repStreet">Calle y Cruzamientos</label>
-                <input type="text" id="repStreet" placeholder="Ej. Calle 35 por 56 o frente al parque" required>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="repWaterLevel">Nivel del Agua</label>
-                  <select id="repWaterLevel" required>
-                    <option value="bajo">🟢 Bajo (&lt;15 cm, banqueta libre)</option>
-                    <option value="medio">🟡 Medio (15-40 cm, banqueta rebasada)</option>
-                    <option value="critico">🔴 Crítico (&gt;40 cm, nivel de rodilla / autos)</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="repAuthor">Tu Nombre / Pseudónimo</label>
-                  <input type="text" id="repAuthor" placeholder="Vecino anónimo">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="repDescription">Descripción del suceso</label>
-                <textarea id="repDescription" rows="2" placeholder="¿El agua sigue subiendo? ¿Hay coladeras tapadas o vehículos varados?"></textarea>
-              </div>
-
-              <div class="coords-display" id="coordsDisplay">
-                <span>📍 Coordenadas: </span>
-                <strong id="coordsText">Haz clic en el mapa o se usará el centro de la colonia</strong>
-              </div>
-
-              <button type="submit" class="btn-submit-report" id="btnSubmitReport">
-                <span>Enviar Reporte Comunitario</span>
+              <button
+                id="report-submit"
+                type="submit"
+                class="w-full rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Enviar reporte
               </button>
+              <p id="report-message" class="text-sm" role="status" aria-live="polite"></p>
             </form>
-
-            <div class="reports-feed-title">
-              <h4>Reportes Comunitarios Recientes</h4>
-            </div>
-            <div class="reports-list" id="reportsList">
-              <!-- Renderizado dinámicamente -->
-            </div>
-          </div>
-
-          <!-- Pestaña 3: Capa de IA (Gemma / Protección Civil) -->
-          <div class="tab-pane" id="tab-ai">
-            <div class="pane-header">
-              <h3>Alerta Predictiva Generativa (Gemma)</h3>
-              <p class="pane-desc">Síntesis inteligente de riesgo hidrológico, colonias vulnerables y recomendaciones oficiales.</p>
-            </div>
-
-            <div class="ai-controls">
-              <button class="btn-generate-ai" id="btnGenerateAi">
-                <span>✨</span> Generar Boletín Oficial de Protección Civil
-              </button>
-            </div>
-
-            <div class="ai-bulletin-container" id="aiBulletinContainer">
-              <div class="ai-badge-row">
-                <span class="ai-tag">Motor: Gemma / Gemini AI Ready</span>
-                <span class="ai-status-tag" id="aiRiskTag">Nivel Evaluado</span>
-              </div>
-              <div class="ai-bulletin-body" id="aiBulletinText">
-                Haz clic en el botón superior para sintetizar los datos de pronóstico de Open-Meteo, cruce de elevación y emitir el boletín oficial de alerta temprana para la isla.
-              </div>
-            </div>
-
-            <div class="emergency-contacts-card">
-              <h4>🚨 Directorio de Emergencia Carmen:</h4>
-              <ul>
-                <li><strong>Emergencias Nacionales:</strong> 911</li>
-                <li><strong>Protección Civil Carmen:</strong> (938) 382-4911</li>
-                <li><strong>Cruz Roja Mexicana Delegación Carmen:</strong> (938) 382-1520</li>
-                <li><strong>SMAPAC (Reporte de Drenajes):</strong> (938) 384-1800</li>
+            <div class="mt-4 border-t border-slate-100 pt-3">
+              <h3 class="text-sm font-medium text-slate-800">Reportes recientes</h3>
+              <ul id="report-list" class="mt-2 space-y-2 text-sm text-slate-600">
+                <li>Cargando reportes...</li>
               </ul>
             </div>
-          </div>
+          </section>
+        </aside>
 
-          <!-- Pestaña 4: Capa de Datos Históricos (NASA POWER) -->
-          <div class="tab-pane" id="tab-history">
-            <div class="pane-header">
-              <h3>Historial de Precipitación (NASA POWER)</h3>
-              <p class="pane-desc">Validación de umbrales críticos mediante datos satelitales agroclimatológicos de la NASA para Isla del Carmen.</p>
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Mapa de zonas de riesgo">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div>
+              <h2 class="font-semibold text-slate-900">Mapa de Ciudad del Carmen</h2>
+              <p class="text-xs text-slate-500">Selecciona un marcador para ver el nivel de riesgo</p>
             </div>
-
-            <div class="nasa-stat-grid">
-              <div class="nasa-card">
-                <span class="nasa-card-title">Promedio Diario Histórico</span>
-                <span class="nasa-card-value" id="nasaAvg">-- mm</span>
-                <span class="nasa-card-foot">Temporada de lluvias (Octubre)</span>
-              </div>
-              <div class="nasa-card">
-                <span class="nasa-card-title">Pico Máximo Registrado</span>
-                <span class="nasa-card-value warning" id="nasaPeak">-- mm</span>
-                <span class="nasa-card-foot">Episodio de tormenta severa</span>
-              </div>
-              <div class="nasa-card">
-                <span class="nasa-card-title">Umbral Crítico de Anegación</span>
-                <span class="nasa-card-value critical">40.0 mm</span>
-                <span class="nasa-card-foot">Punto de colapso de drenaje Carmen</span>
-              </div>
-            </div>
-
-            <div class="nasa-explanation">
-              <h4>¿Por qué se inunda Ciudad del Carmen?</h4>
-              <p>
-                Ciudad del Carmen se ubica en una isla de barrera entre el Golfo de México y la Laguna de Términos con cotas que apenas oscilan entre <strong>0.5 y 2.0 metros</strong> sobre el nivel medio del mar.
-              </p>
-              <p>
-                Cuando una precipitación supera los <strong>35-40 mm</strong> y coincide con la marea alta (pleamar), la red pluvial no puede descargar por gravedad, provocando el reflujo del agua salobre hacia colonias bajas como La Manigua, Caracol y Arroyo de los Franceses.
-              </p>
-            </div>
-
-            <div class="nasa-chart-preview" id="nasaChartPreview">
-              <!-- Barras de precipitación histórica de la NASA -->
+            <div class="flex gap-3 text-xs font-medium text-slate-600" aria-label="Leyenda del mapa">
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-green-500"></i>Verde</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-amber-500"></i>Amarillo</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-500"></i>Rojo</span>
             </div>
           </div>
-
-        </div>
-      </aside>
+          <div id="map" role="application" aria-label="Mapa interactivo con las zonas de riesgo"></div>
+          <div class="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+            Mapa © OpenStreetMap contributors · Niveles de riesgo orientativos
+          </div>
+        </section>
+      </div>
     </main>
 
-    <!-- Modal de Arquitectura y Pitch -->
-    <div class="modal-backdrop" id="pitchModal">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2>🎯 Arquitectura del Proyecto & Pitch Hackathon</h2>
-          <button class="modal-close" id="closePitchBtn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="pitch-quote-box">
-            <div class="quote-tag">Frase del Pitch</div>
-            <p>
-              "Nuestra arquitectura es simple: un frontend ligero con Leaflet, un backend mínimo que consume datos abiertos de Open-Meteo y NASA POWER, y una capa de IA que cruza el pronóstico con el historial de inundaciones de Carmen para generar alertas tempranas. Todo corre en el navegador, sin bases de datos pesadas, y se puede desplegar en cualquier servidor."
-            </p>
-          </div>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script>
+      const map = L.map("map").setView([18.6575, -91.8325], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
 
-          <div class="architecture-grid">
-            <div class="arch-col">
-              <h4>1. Frontend Ligero</h4>
-              <p>HTML5 + CSS moderno + Vanilla JS. Leaflet.js sobre OpenStreetMap sin tokens de pago. Responsive y de carga ultrarrápida.</p>
-            </div>
-            <div class="arch-col">
-              <h4>2. Datos Abiertos</h4>
-              <p>Open-Meteo (pronóstico en tiempo real sin key) + NASA POWER (historial satelital de precipitaciones en Isla del Carmen).</p>
-            </div>
-            <div class="arch-col">
-              <h4>3. Backend Python / Flask</h4>
-              <p>Un solo archivo que procesa las APIs meteorológicas, cruza datos hidrológicos y gestiona reportes ciudadanos con persistencia JSON.</p>
-            </div>
-            <div class="arch-col">
-              <h4>4. IA Gemma / Gemini Ready</h4>
-              <p>Síntesis de riesgo generativo para Protección Civil: transforma milímetros de lluvia en avisos cívicos comprensibles y directos.</p>
-            </div>
-          </div>
+      const markers = [];
+      const zoneList = document.getElementById("zone-list");
+      const reportList = document.getElementById("report-list");
+      const numberOrDash = (value, unit) =>
+        typeof value === "number" ? `${value.toFixed(1)} ${unit}` : "--";
 
-          <div class="modal-footer-note">
-            <span>🛡️ Proyecto optimizado para Hackathon MLH OLARUTA · Ciudad del Carmen, Campeche</span>
-          </div>
-        </div>
-      </div>
-    </div>
+      async function readApiResponse(response) {
+        const contentType = response.headers.get("content-type") || "";
+        const body = await response.text();
+        if (!body.trim()) {
+          throw new Error(
+            response.ok
+              ? "El servidor devolvió una respuesta vacía."
+              : `El servidor respondió con el error ${response.status} sin detalles.`
+          );
+        }
+        if (!contentType.toLowerCase().includes("json")) {
+          if (response.status === 404) {
+            throw new Error(
+              "La ruta de la API devolvió 404. Abre HydroAlert desde Flask en " +
+              "http://127.0.0.1:5000 (no con Live Server) y vuelve a cargar la página."
+            );
+          }
+          throw new Error(
+            `La API devolvió una respuesta que no es JSON (HTTP ${response.status}). ` +
+            "Comprueba que la aplicación Flask esté ejecutándose y que la URL sea correcta."
+          );
+        }
+        try {
+          return JSON.parse(body);
+        } catch {
+          throw new Error("La API devolvió JSON inválido.");
+        }
+      }
 
-  </div>
+      function renderZones(zones) {
+        zoneList.replaceChildren();
+        markers.forEach((marker) => map.removeLayer(marker));
+        markers.length = 0;
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="/static/js/app.js"></script>
-</body>
+        if (!Array.isArray(zones) || zones.length === 0) {
+          const item = document.createElement("li");
+          item.className = "py-3 text-sm text-slate-500";
+          item.textContent = "No hay zonas disponibles.";
+          zoneList.append(item);
+          return;
+        }
+
+        zones.forEach((zone) => {
+          const item = document.createElement("li");
+          item.className = "flex items-center justify-between gap-3 py-3";
+
+          const name = document.createElement("span");
+          name.className = "text-sm font-medium text-slate-700";
+          name.textContent = zone.name;
+
+          const level = document.createElement("span");
+          level.className = "inline-flex items-center gap-2 text-sm font-semibold";
+          level.style.color = zone.color;
+          const dot = document.createElement("i");
+          dot.className = "h-2.5 w-2.5 rounded-full";
+          dot.style.backgroundColor = zone.color;
+          const label = document.createElement("span");
+          label.textContent = zone.level;
+          level.append(dot, label);
+          item.append(name, level);
+          zoneList.append(item);
+
+          const marker = L.circleMarker([zone.latitude, zone.longitude], {
+            radius: 9,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: zone.color,
+            fillOpacity: 0.95
+          }).addTo(map);
+          const popup = document.createElement("div");
+          const popupName = document.createElement("strong");
+          popupName.textContent = zone.name;
+          const popupLevel = document.createElement("div");
+          popupLevel.textContent = `Riesgo: ${zone.level}`;
+          popup.append(popupName, popupLevel);
+          marker.bindPopup(popup);
+          markers.push(marker);
+        });
+
+        if (markers.length) {
+          map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
+        }
+      }
+
+      async function loadStatus() {
+        const state = document.getElementById("weather-state");
+        try {
+          const response = await fetch("{{ url_for('api_status') }}");
+          const data = await readApiResponse(response);
+          renderZones(data.zones);
+          if (!response.ok) {
+            state.textContent = data.error || "No se pudo consultar el clima actual.";
+            state.className = "mt-4 text-sm text-amber-700";
+            return;
+          }
+
+          const weather = data.weather;
+          document.getElementById("weather-data").classList.remove("hidden");
+          document.getElementById("precipitation").textContent =
+            numberOrDash(weather.precipitation_mm, "mm");
+          document.getElementById("temperature").textContent =
+            numberOrDash(weather.temperature_c, "°C");
+          document.getElementById("humidity").textContent =
+            numberOrDash(weather.humidity_percent, "%");
+          document.getElementById("wind").textContent =
+            numberOrDash(weather.wind_speed_kmh, "km/h");
+          document.getElementById("observed-at").textContent =
+            weather.observed_at || "--";
+          state.textContent = `Condiciones en ${data.location}`;
+          state.className = "mt-4 text-sm text-slate-500";
+        } catch (error) {
+          state.textContent = error.message || "No se pudo conectar con el servicio meteorológico.";
+          state.className = "mt-4 text-sm text-amber-700";
+          zoneList.replaceChildren();
+          const item = document.createElement("li");
+          item.className = "py-3 text-sm text-slate-500";
+          item.textContent = "No se pudieron cargar las zonas.";
+          zoneList.append(item);
+        }
+      }
+
+      function renderReports(reports) {
+        reportList.replaceChildren();
+        if (!reports.length) {
+          const item = document.createElement("li");
+          item.textContent = "Aún no hay reportes.";
+          reportList.append(item);
+          return;
+        }
+
+        reports.slice(-5).reverse().forEach((report) => {
+          const item = document.createElement("li");
+          item.className = "rounded-lg bg-slate-50 px-3 py-2";
+          const street = document.createElement("span");
+          street.className = "font-medium text-slate-800";
+          street.textContent = report.street;
+          const level = document.createElement("span");
+          level.className = "ml-2 text-xs capitalize text-slate-500";
+          level.textContent = report.water_level;
+          item.append(street, level);
+          reportList.append(item);
+        });
+      }
+
+      async function loadReports() {
+        try {
+          const response = await fetch("{{ url_for('api_reports') }}");
+          const data = await readApiResponse(response);
+          if (!response.ok) {
+            throw new Error(data.error || "No se pudieron cargar los reportes.");
+          }
+          renderReports(data.reports);
+        } catch (error) {
+          reportList.replaceChildren();
+          const item = document.createElement("li");
+          item.className = "text-sm text-amber-700";
+          item.textContent = error.message;
+          reportList.append(item);
+        }
+      }
+
+      document.getElementById("report-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submitButton = document.getElementById("report-submit");
+        const message = document.getElementById("report-message");
+        const formData = new FormData(form);
+        submitButton.disabled = true;
+        message.textContent = "Enviando reporte...";
+        message.className = "text-sm text-slate-500";
+
+        try {
+          const response = await fetch("{{ url_for('api_reports') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              street: formData.get("street"),
+              water_level: formData.get("water_level")
+            })
+          });
+          const data = await readApiResponse(response);
+          if (!response.ok) {
+            throw new Error(data.error || "No se pudo guardar el reporte.");
+          }
+          message.textContent = "Reporte enviado. Gracias por ayudar a tu comunidad.";
+          message.className = "text-sm text-emerald-700";
+          form.reset();
+          await loadReports();
+        } catch (error) {
+          message.textContent = error.message || "No se pudo conectar con el servidor.";
+          message.className = "text-sm text-red-700";
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
+
+      loadStatus();
+      loadReports();
+    </script>
+  </body>
 </html>

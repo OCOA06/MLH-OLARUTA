@@ -1,0 +1,20 @@
+[
+  {
+    "id": "rep-001",
+    "street": "Calle 5 de Mayo esq. Pino Suarez (Col. La Manigua)",
+    "water_level": "moderado",
+    "created_at": "2026-10-15T11:15:00Z"
+  },
+  {
+    "id": "rep-002",
+    "street": "Av. Caleta frente a Escuela Tecnica 21",
+    "water_level": "bajo",
+    "created_at": "2026-10-15T11:45:00Z"
+  },
+  {
+    "id": "rep-003",
+    "street": "Calle 47 por calle 28 (Arroyo de los Franceses)",
+    "water_level": "alto",
+    "created_at": "2026-10-15T12:30:00Z"
+  }
+]
