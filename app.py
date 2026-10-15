@@ -31,6 +31,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
     return response
 
+
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 CITY_COORDINATES = {"latitude": 18.6575, "longitude": -91.8325}
 REPORTS_FILE = Path(__file__).resolve().parent / "reports.json"
@@ -100,7 +101,7 @@ RISK_ZONES = [
     },
 ]
 
-WATER_LEVELS = {"bajo", "moderado", "alto"}
+REPORT_TYPES = {"inundacion", "construccion", "accidente"}
 
 
 def get_current_weather() -> dict[str, Any]:
@@ -202,6 +203,7 @@ def api_status():
 def api_reports():
     if request.method == "OPTIONS":
         return "", 204
+
     if request.method == "GET":
         try:
             with REPORTS_LOCK:
@@ -215,20 +217,45 @@ def api_reports():
     if not isinstance(data, dict):
         return jsonify({"error": "Envía un objeto JSON válido."}), 400
 
-    street = data.get("street")
-    water_level = data.get("water_level")
+    street = data.get("calle", data.get("street"))
+    report_type = data.get("tipo")
+    description = data.get("descripcion", "")
+
     if not isinstance(street, str) or not street.strip():
         return jsonify({"error": "La calle es obligatoria."}), 400
     street = street.strip()
     if len(street) > 160:
         return jsonify({"error": "La calle no puede superar 160 caracteres."}), 400
-    if not isinstance(water_level, str) or water_level not in WATER_LEVELS:
-        return jsonify({"error": "Selecciona un nivel de agua válido."}), 400
+    if not isinstance(report_type, str) or report_type not in REPORT_TYPES:
+        return jsonify({"error": "Selecciona un tipo de reporte válido."}), 400
+    if not isinstance(description, str):
+        return jsonify({"error": "La descripción debe ser texto."}), 400
+    description = description.strip()
+    if len(description) > 1000:
+        return jsonify({"error": "La descripción no puede superar 1000 caracteres."}), 400
+
+    latitude = data.get("lat")
+    longitude = data.get("lng")
+    if (latitude is None) != (longitude is None):
+        return jsonify({"error": "Envía ambas coordenadas (lat y lng), o ninguna."}), 400
+    if latitude is not None:
+        if (
+            isinstance(latitude, bool)
+            or isinstance(longitude, bool)
+            or not isinstance(latitude, (int, float))
+            or not isinstance(longitude, (int, float))
+            or not -90 <= latitude <= 90
+            or not -180 <= longitude <= 180
+        ):
+            return jsonify({"error": "Las coordenadas no son válidas."}), 400
 
     report = {
         "id": str(uuid.uuid4()),
-        "street": street,
-        "water_level": water_level,
+        "calle": street,
+        "tipo": report_type,
+        "descripcion": description,
+        "lat": latitude,
+        "lng": longitude,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     try:

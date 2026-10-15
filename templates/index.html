@@ -40,7 +40,7 @@
 
     <main class="mx-auto max-w-screen-2xl p-4 sm:p-6">
       <div class="mb-5">
-        <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">Centro de monitoreo</p>
+        <p class="text-sm font-semibold uppercase tracking-wider text-cyan-700">OlaRuta · Centro de monitoreo</p>
         <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Lluvia y zonas de riesgo</h1>
         <p class="mt-1 text-sm text-slate-600">Consulta las condiciones actuales y comparte lo que ocurre en tu calle.</p>
       </div>
@@ -93,8 +93,8 @@
           </section>
 
           <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="report-heading">
-            <h2 id="report-heading" class="font-semibold text-slate-900">Reportar anegamiento</h2>
-            <p class="mt-1 text-sm text-slate-500">Ayuda a tus vecinos compartiendo las condiciones de tu calle.</p>
+            <h2 id="report-heading" class="font-semibold text-slate-900">Crear reporte ciudadano</h2>
+            <p class="mt-1 text-sm text-slate-500">Reporta inundaciones, obras o accidentes en tu calle.</p>
             <form id="report-form" class="mt-4 space-y-3">
               <div>
                 <label for="street" class="mb-1 block text-sm font-medium text-slate-700">Calle o ubicación</label>
@@ -110,19 +110,33 @@
                 >
               </div>
               <div>
-                <label for="water-level" class="mb-1 block text-sm font-medium text-slate-700">Nivel del agua</label>
+                <label for="report-type" class="mb-1 block text-sm font-medium text-slate-700">Tipo de reporte</label>
                 <select
-                  id="water-level"
-                  name="water_level"
+                  id="report-type"
+                  name="tipo"
                   required
                   class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
                 >
-                  <option value="" disabled selected>Selecciona una opción</option>
-                  <option value="bajo">Bajo — encharcamiento</option>
-                  <option value="moderado">Moderado — dificulta el paso</option>
-                  <option value="alto">Alto — calle inundada</option>
+                  <option value="" disabled selected>Selecciona un tipo</option>
+                  <option value="inundacion">🔴 Inundación / Anegamiento</option>
+                  <option value="construccion">🔵 En Construcción / Remodelación</option>
+                  <option value="accidente">🟠 Accidente / Obstrucción vial</option>
                 </select>
               </div>
+              <div>
+                <label for="description" class="mb-1 block text-sm font-medium text-slate-700">Descripción (opcional)</label>
+                <textarea
+                  id="description"
+                  name="descripcion"
+                  maxlength="1000"
+                  rows="2"
+                  placeholder="Agrega detalles útiles para la comunidad"
+                  class="w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                ></textarea>
+              </div>
+              <input id="report-lat" name="lat" type="hidden">
+              <input id="report-lng" name="lng" type="hidden">
+              <p id="report-location" class="text-xs text-slate-500">Opcional: haz clic en el mapa para señalar la ubicación.</p>
               <button
                 id="report-submit"
                 type="submit"
@@ -145,12 +159,15 @@
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
             <div>
               <h2 class="font-semibold text-slate-900">Mapa de Ciudad del Carmen</h2>
-              <p class="text-xs text-slate-500">Selecciona un marcador para ver el nivel de riesgo</p>
+              <p class="text-xs text-slate-500">Haz clic en el mapa para ubicar un reporte o selecciona un marcador</p>
             </div>
-            <div class="flex gap-3 text-xs font-medium text-slate-600" aria-label="Leyenda del mapa">
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-600" aria-label="Leyenda del mapa">
               <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-green-500"></i>Verde</span>
               <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-amber-500"></i>Amarillo</span>
               <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-500"></i>Rojo</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-red-600"></i>Inundación</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-blue-600"></i>Construcción</span>
+              <span class="flex items-center gap-1.5"><i class="h-2.5 w-2.5 rounded-full bg-orange-500"></i>Accidente</span>
             </div>
           </div>
           <div id="map" role="application" aria-label="Mapa interactivo con las zonas de riesgo"></div>
@@ -169,46 +186,96 @@
     <script>
       const JINJA_STATUS_URL = "{{ url_for('api_status') }}";
       const JINJA_REPORTS_URL = "{{ url_for('api_reports') }}";
+
       const map = L.map("map").setView([18.6575, -91.8325], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
 
+      let selectedLocationMarker = null;
+      map.on("click", (event) => {
+        const { lat, lng } = event.latlng;
+        document.getElementById("report-lat").value = lat.toFixed(6);
+        document.getElementById("report-lng").value = lng.toFixed(6);
+        document.getElementById("report-location").textContent =
+          `Ubicación seleccionada: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        if (selectedLocationMarker) {
+          selectedLocationMarker.setLatLng(event.latlng);
+        } else {
+          selectedLocationMarker = L.marker(event.latlng).addTo(map);
+        }
+        selectedLocationMarker.bindPopup("Ubicación del nuevo reporte").openPopup();
+      });
+
       const markers = [];
+      const reportMarkers = [];
       const zoneList = document.getElementById("zone-list");
       const reportList = document.getElementById("report-list");
+      const reportTypeColors = {
+        inundacion: "#dc2626",
+        construccion: "#2563eb",
+        accidente: "#f97316"
+      };
+      const reportTypeLabels = {
+        inundacion: "Inundación / Anegamiento",
+        construccion: "Construcción / Remodelación",
+        accidente: "Accidente / Obstrucción vial"
+      };
+
+      const DEFAULT_ZONES = [
+        { name: "Centro Histórico", latitude: 18.6388, longitude: -91.8367, base_risk: 2 },
+        { name: "Colonia Santa Margarita", latitude: 18.6505, longitude: -91.8298, base_risk: 3 },
+        { name: "Colonia 23 de Julio", latitude: 18.6652, longitude: -91.8195, base_risk: 2 },
+        { name: "Colonia La Manigua", latitude: 18.6325, longitude: -91.8322, base_risk: 3 },
+        { name: "Colonia El Caracol", latitude: 18.6438, longitude: -91.8290, base_risk: 3 },
+        { name: "Playón / Arroyo de los Franceses", latitude: 18.6410, longitude: -91.8155, base_risk: 3 },
+        { name: "La Caleta / Boquerón del Palmar", latitude: 18.6535, longitude: -91.8360, base_risk: 2 },
+        { name: "Colonia Tierra y Libertad", latitude: 18.6360, longitude: -91.8080, base_risk: 2 },
+        { name: "Justo Sierra", latitude: 18.6245, longitude: -91.8315, base_risk: 1 },
+        { name: "Playa Norte", latitude: 18.6604, longitude: -91.8068, base_risk: 2 }
+      ];
+
+      function computeRiskLevel(baseRisk, precipMm) {
+        if (precipMm >= 15 || baseRisk >= 3) return { level: "Rojo", color: "#ef4444" };
+        if (precipMm >= 5 || baseRisk >= 2) return { level: "Amarillo", color: "#f59e0b" };
+        return { level: "Verde", color: "#22c55e" };
+      }
+
+      async function fetchOpenMeteoDirectly() {
+        const url = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Open-Meteo devolvió HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        const cur = payload.current || {};
+        const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+        const zones = DEFAULT_ZONES.map((zone) => {
+          const risk = computeRiskLevel(zone.base_risk, precip);
+          return {
+            name: zone.name,
+            latitude: zone.latitude,
+            longitude: zone.longitude,
+            level: risk.level,
+            color: risk.color
+          };
+        });
+        return {
+          location: "Ciudad del Carmen",
+          weather: {
+            precipitation_mm: precip,
+            temperature_c: cur.temperature_2m,
+            humidity_percent: cur.relative_humidity_2m,
+            wind_speed_kmh: cur.wind_speed_10m,
+            observed_at: cur.time
+          },
+          zones: zones
+        };
+      }
+
       const numberOrDash = (value, unit) =>
         typeof value === "number" ? `${value.toFixed(1)} ${unit}` : "--";
-
-      async function readApiResponse(response) {
-        const contentType = response.headers.get("content-type") || "";
-        const body = await response.text();
-        if (!body.trim()) {
-          throw new Error(
-            response.ok
-              ? "El servidor devolvió una respuesta vacía."
-              : `El servidor respondió con el error ${response.status} sin detalles.`
-          );
-        }
-        if (!contentType.toLowerCase().includes("json")) {
-          if (response.status === 404) {
-            throw new Error(
-              "La ruta de la API devolvió 404. Abre OlaRuta desde Flask en " +
-              "http://127.0.0.1:5000 (no con Live Server) y vuelve a cargar la página."
-            );
-          }
-          throw new Error(
-            `La API devolvió una respuesta que no es JSON (HTTP ${response.status}). ` +
-            "Comprueba que la aplicación Flask esté ejecutándose y que la URL sea correcta."
-          );
-        }
-        try {
-          return JSON.parse(body);
-        } catch {
-          throw new Error("La API devolvió JSON inválido.");
-        }
-      }
 
       function renderZones(zones) {
         zoneList.replaceChildren();
@@ -265,62 +332,10 @@
         }
       }
 
-      const DEFAULT_ZONES = [
-        { name: "Centro Histórico", latitude: 18.6388, longitude: -91.8367, base_risk: 2 },
-        { name: "Colonia Santa Margarita", latitude: 18.6505, longitude: -91.8298, base_risk: 3 },
-        { name: "Colonia 23 de Julio", latitude: 18.6652, longitude: -91.8195, base_risk: 2 },
-        { name: "Colonia La Manigua", latitude: 18.6325, longitude: -91.8322, base_risk: 3 },
-        { name: "Colonia El Caracol", latitude: 18.6438, longitude: -91.8290, base_risk: 3 },
-        { name: "Playón / Arroyo de los Franceses", latitude: 18.6410, longitude: -91.8155, base_risk: 3 },
-        { name: "La Caleta / Boquerón del Palmar", latitude: 18.6535, longitude: -91.8360, base_risk: 2 },
-        { name: "Colonia Tierra y Libertad", latitude: 18.6360, longitude: -91.8080, base_risk: 2 },
-        { name: "Justo Sierra", latitude: 18.6245, longitude: -91.8315, base_risk: 1 },
-        { name: "Playa Norte", latitude: 18.6604, longitude: -91.8068, base_risk: 2 }
-      ];
-
-      function computeRiskLevel(baseRisk, precipMm) {
-        if (precipMm >= 15 || baseRisk >= 3) return { level: "Rojo", color: "#ef4444" };
-        if (precipMm >= 5 || baseRisk >= 2) return { level: "Amarillo", color: "#f59e0b" };
-        return { level: "Verde", color: "#22c55e" };
-      }
-
-      async function fetchOpenMeteoDirectly() {
-        const url = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Open-Meteo devolvió HTTP ${response.status}`);
-        }
-        const payload = await response.json();
-        const cur = payload.current || {};
-        const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
-        const zones = DEFAULT_ZONES.map((zone) => {
-          const risk = computeRiskLevel(zone.base_risk, precip);
-          return {
-            name: zone.name,
-            latitude: zone.latitude,
-            longitude: zone.longitude,
-            level: risk.level,
-            color: risk.color
-          };
-        });
-        return {
-          location: "Ciudad del Carmen",
-          weather: {
-            precipitation_mm: precip,
-            temperature_c: cur.temperature_2m,
-            humidity_percent: cur.relative_humidity_2m,
-            wind_speed_kmh: cur.wind_speed_10m,
-            observed_at: cur.time
-          },
-          zones: zones
-        };
-      }
-
       async function loadStatus() {
         const state = document.getElementById("weather-state");
         let data = null;
 
-        // Lista de URLs a intentar (Flask local o puerto 5000)
         const candidates = [];
         if (JINJA_STATUS_URL.startsWith("/")) {
           candidates.push(JINJA_STATUS_URL);
@@ -341,13 +356,9 @@
                 break;
               }
             }
-          } catch (_) {
-            // Continúa con la siguiente opción o respaldo directo
-          }
+          } catch (_) {}
         }
 
-        // Si el backend Flask no está corriendo (ej. se abrió con Live Server o archivo local),
-        // consulta Open-Meteo directamente desde el cliente en vivo:
         if (!data || !data.weather) {
           try {
             data = await fetchOpenMeteoDirectly();
@@ -380,16 +391,34 @@
         state.className = "mt-4 text-sm text-slate-500";
       }
 
-      const LOCAL_REPORTS_KEY = "olaruta_reports_cache";
+      const LOCAL_REPORTS_KEY = "olaruta_reports_cache_v2";
       function getLocalReports() {
         try {
           const cached = localStorage.getItem(LOCAL_REPORTS_KEY);
           if (cached) return JSON.parse(cached);
         } catch (_) {}
         return [
-          { street: "Calle 5 de Mayo esq. Pino Suárez (Col. La Manigua)", water_level: "moderado" },
-          { street: "Av. Caleta frente a Escuela Técnica 21", water_level: "bajo" },
-          { street: "Calle 47 por calle 28 (Arroyo de los Franceses)", water_level: "alto" }
+          {
+            calle: "Calle 35-D",
+            tipo: "inundacion",
+            descripcion: "Fuera de la privada zumarraga",
+            lat: 18.651324,
+            lng: -91.820844
+          },
+          {
+            calle: "Av. Concordia por Calle 56",
+            tipo: "construccion",
+            descripcion: "Reparación de rejilla pluvial y bacheo en carril derecho.",
+            lat: 18.6438,
+            lng: -91.829
+          },
+          {
+            calle: "Av. Isla de Tris frente a Plaza Palmira",
+            tipo: "accidente",
+            descripcion: "Vehículo varado por falla mecánica, precaución al circular.",
+            lat: 18.6582,
+            lng: -91.802
+          }
         ];
       }
 
@@ -403,6 +432,9 @@
 
       function renderReports(reports) {
         reportList.replaceChildren();
+        reportMarkers.forEach((marker) => map.removeLayer(marker));
+        reportMarkers.length = 0;
+
         if (!reports.length) {
           const item = document.createElement("li");
           item.textContent = "Aún no hay reportes.";
@@ -410,16 +442,60 @@
           return;
         }
 
+        reports.forEach((report) => {
+          const streetName = report.calle || report.street || "Ubicación sin nombre";
+          const type = report.tipo || (report.water_level ? "inundacion" : "");
+          const description = report.descripcion || "";
+
+          if (
+            Number.isFinite(Number(report.lat)) &&
+            Number.isFinite(Number(report.lng)) &&
+            report.lat !== null &&
+            report.lng !== null &&
+            reportTypeColors[type]
+          ) {
+            const marker = L.circleMarker([Number(report.lat), Number(report.lng)], {
+              radius: 8,
+              color: "#ffffff",
+              weight: 2,
+              fillColor: reportTypeColors[type],
+              fillOpacity: 0.95
+            }).addTo(map);
+            const popup = document.createElement("div");
+            const popupTitle = document.createElement("strong");
+            popupTitle.textContent = reportTypeLabels[type] || "Reporte";
+            const popupStreet = document.createElement("div");
+            popupStreet.textContent = streetName;
+            popup.append(popupTitle, popupStreet);
+            if (description) {
+              const popupDescription = document.createElement("div");
+              popupDescription.className = "text-xs text-slate-500 mt-1";
+              popupDescription.textContent = description;
+              popup.append(popupDescription);
+            }
+            marker.bindPopup(popup);
+            reportMarkers.push(marker);
+          }
+        });
+
         reports.slice(-5).reverse().forEach((report) => {
           const item = document.createElement("li");
           item.className = "rounded-lg bg-slate-50 px-3 py-2";
           const street = document.createElement("span");
           street.className = "font-medium text-slate-800";
-          street.textContent = report.street;
-          const level = document.createElement("span");
-          level.className = "ml-2 text-xs capitalize text-slate-500";
-          level.textContent = report.water_level;
-          item.append(street, level);
+          street.textContent = report.calle || report.street || "Ubicación sin nombre";
+          const type = report.tipo || (report.water_level ? "inundacion" : "");
+          const badge = document.createElement("span");
+          badge.className = "ml-2 text-xs font-semibold";
+          badge.style.color = reportTypeColors[type] || "#64748b";
+          badge.textContent = reportTypeLabels[type] || "Reporte";
+          item.append(street, badge);
+          if (report.descripcion) {
+            const desc = document.createElement("p");
+            desc.className = "mt-1 text-xs text-slate-500";
+            desc.textContent = report.descripcion;
+            item.append(desc);
+          }
           reportList.append(item);
         });
       }
@@ -448,7 +524,6 @@
           } catch (_) {}
         }
 
-        // Si el backend no responde, mostrar los reportes locales guardados
         renderReports(getLocalReports());
       }
 
@@ -459,16 +534,24 @@
         const message = document.getElementById("report-message");
         const formData = new FormData(form);
         const street = (formData.get("street") || "").trim();
-        const water_level = formData.get("water_level");
+        const tipo = formData.get("tipo");
+        const descripcion = (formData.get("descripcion") || "").trim();
+        const lat = formData.get("lat") ? Number(formData.get("lat")) : null;
+        const lng = formData.get("lng") ? Number(formData.get("lng")) : null;
 
-        if (!street || !water_level) return;
+        if (!street || !tipo) return;
 
         submitButton.disabled = true;
         message.textContent = "Enviando reporte...";
         message.className = "text-sm text-slate-500";
 
-        const payload = { street, water_level };
-        let sentToBackend = false;
+        const payload = {
+          calle: street,
+          tipo: tipo,
+          descripcion: descripcion,
+          lat: lat,
+          lng: lng
+        };
 
         const candidates = [];
         if (JINJA_REPORTS_URL.startsWith("/")) {
@@ -489,18 +572,24 @@
             clearTimeout(timer);
             const ct = response.headers.get("content-type") || "";
             if (response.ok && ct.toLowerCase().includes("json")) {
-              sentToBackend = true;
               break;
             }
           } catch (_) {}
         }
 
-        // Guardar también en almacenamiento local
-        saveLocalReport({ street, water_level, created_at: new Date().toISOString() });
+        saveLocalReport(payload);
 
         message.textContent = "Reporte guardado con éxito. Gracias por contribuir.";
         message.className = "text-sm text-emerald-700";
         form.reset();
+        document.getElementById("report-location").textContent =
+          "Opcional: haz clic en el mapa para señalar la ubicación.";
+        document.getElementById("report-lat").value = "";
+        document.getElementById("report-lng").value = "";
+        if (selectedLocationMarker) {
+          map.removeLayer(selectedLocationMarker);
+          selectedLocationMarker = null;
+        }
         await loadReports();
         submitButton.disabled = false;
       });
