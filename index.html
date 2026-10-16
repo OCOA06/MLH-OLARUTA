@@ -440,7 +440,7 @@
                 >
                 <div class="text-xs sm:text-sm text-slate-800">
                   <strong class="font-bold text-slate-900">Playa norte</strong>
-                  <span id="forecast-pill-1" class="text-slate-700"> - 85% de probabilidad (5:00 pm)</span>
+                  <span id="forecast-pill-1" class="text-slate-700"> - 79% de probabilidad (2:00 pm)</span>
                 </div>
               </div>
 
@@ -454,7 +454,7 @@
                 >
                 <div class="text-xs sm:text-sm text-slate-800">
                   <strong class="font-bold text-slate-900">Col. centro</strong>
-                  <span id="forecast-pill-2" class="text-slate-700"> - 85% de probabilidad (7:00 pm)</span>
+                  <span id="forecast-pill-2" class="text-slate-700"> - 66% de probabilidad (8:00 pm)</span>
                 </div>
               </div>
             </div>
@@ -906,9 +906,7 @@
         const hora = document.getElementById("pred-hora").value.trim() || "5:00 pm";
         const destino = document.getElementById("pred-destino").value.trim() || "Playa norte";
         
-        document.getElementById("forecast-pill-1").textContent = ` - 85% de probabilidad (${hora})`;
-        document.getElementById("forecast-pill-2").textContent = ` - Riesgo estimado para ${destino}`;
-        
+        applyCustomPrediction(hora, destino);
         closeCustomPredictionModal();
         showScreen("forecast");
       });
@@ -998,9 +996,9 @@
 
       const zoneMarkers = [];
 
-      function computeRiskLevel(baseRisk, precipMm) {
+      function computeRiskLevel(baseRisk, precipMm, forecastSum = 0.0) {
         if (precipMm >= 15 || baseRisk >= 3) return { level: "Alto", color: "#ef4444" };
-        if (precipMm >= 5 || baseRisk >= 2) return { level: "Medio", color: "#f59e0b" };
+        if (precipMm >= 5 || baseRisk >= 2 || (forecastSum >= 10 && baseRisk >= 2)) return { level: "Medio", color: "#f59e0b" };
         return { level: "Bajo", color: "#22c55e" };
       }
 
@@ -1044,7 +1042,110 @@
         if (bajoList.length) document.getElementById("risk-bajo-text").textContent = bajoList.slice(0, 3).join(", ");
       }
 
-      // Consulta de Clima con fallback directo a Open-Meteo
+      let currentForecastToday = null;
+
+      const WMO_DESCS = {
+        0: "Despejado",
+        1: "Mayormente despejado",
+        2: "Parcialmente nublado",
+        3: "Nublado",
+        45: "Niebla",
+        48: "Niebla con escarcha",
+        51: "Llovizna ligera",
+        53: "Llovizna moderada",
+        55: "Llovizna densa",
+        61: "Lluvia ligera",
+        63: "Lluvia moderada",
+        65: "Lluvia fuerte",
+        80: "Chubascos ligeros",
+        81: "Chubascos moderados",
+        82: "Chubascos violentos",
+        95: "Tormenta eléctrica",
+        96: "Tormenta con granizo leve",
+        99: "Tormenta con granizo fuerte"
+      };
+
+      function updateForecastTodayUI(forecast) {
+        if (!forecast) return;
+        currentForecastToday = forecast;
+
+        // Actualizar las dos píldoras de pronóstico con los datos reales de hoy
+        const pill1 = document.getElementById("forecast-pill-1");
+        const pill2 = document.getElementById("forecast-pill-2");
+
+        if (forecast.peak_hours && forecast.peak_hours.length > 0) {
+          const p1 = forecast.peak_hours[0];
+          if (pill1) pill1.textContent = ` - ${p1.probability}% de probabilidad (${p1.label})`;
+
+          if (forecast.peak_hours.length > 1) {
+            const p2 = forecast.peak_hours[1];
+            if (pill2) pill2.textContent = ` - ${p2.probability}% de probabilidad (${p2.label})`;
+          }
+        }
+      }
+
+      async function applyCustomPrediction(horaInput, destinoInput) {
+        let result = null;
+
+        const candidates = [
+          `/api/predict?hora=${encodeURIComponent(horaInput)}&destino=${encodeURIComponent(destinoInput)}`,
+          `http://127.0.0.1:5000/api/predict?hora=${encodeURIComponent(horaInput)}&destino=${encodeURIComponent(destinoInput)}`
+        ];
+
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            if (res.ok) {
+              result = await res.json();
+              if (result && !result.error) break;
+            }
+          } catch (_) {}
+        }
+
+        if (!result || result.error) {
+          let targetH = 17;
+          const match = horaInput.toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+          if (match) {
+            let h = parseInt(match[1], 10);
+            const ampm = match[3];
+            if (ampm === "pm" && h < 12) h += 12;
+            else if (ampm === "am" && h === 12) h = 0;
+            targetH = Math.max(0, Math.min(23, h));
+          }
+
+          let matchedSlot = null;
+          if (currentForecastToday && currentForecastToday.hourly) {
+            matchedSlot = currentForecastToday.hourly.find(s => s.hour.startsWith(`${String(targetH).padStart(2, "0")}:`));
+          }
+          if (!matchedSlot && currentForecastToday && currentForecastToday.hourly && currentForecastToday.hourly.length) {
+            matchedSlot = currentForecastToday.hourly[0];
+          }
+
+          const prob = matchedSlot ? (matchedSlot.probability || 0) : 0;
+          result = {
+            probabilidad_lluvia: prob,
+            etiqueta_hora: matchedSlot ? matchedSlot.label : horaInput,
+            destino: destinoInput
+          };
+        }
+
+        // Actualizar exactamente las píldoras del diseño original con el dato real de hoy
+        const pill1 = document.getElementById("forecast-pill-1");
+        const pill2 = document.getElementById("forecast-pill-2");
+
+        if (pill1) pill1.textContent = ` - ${result.probabilidad_lluvia}% de probabilidad (${result.etiqueta_hora || horaInput})`;
+        if (pill2) pill2.textContent = ` - Riesgo estimado para ${result.destino || destinoInput}`;
+
+        const destClean = (destinoInput || "").toLowerCase().trim();
+        const matchedZone = DEFAULT_ZONES.find(z => z.name.toLowerCase().includes(destClean) || destClean.includes(z.name.toLowerCase()));
+        if (matchedZone && typeof map !== "undefined") {
+          map.flyTo([matchedZone.latitude, matchedZone.longitude], 14, { duration: 1 });
+        }
+      }
+
       async function loadWeatherAndRisk() {
         let weatherData = null;
         const candidates = [STATUS_URL, "http://127.0.0.1:5000/api/status", "http://localhost:5000/api/status"];
@@ -1052,7 +1153,7 @@
         for (const url of candidates) {
           try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 2000);
+            const timer = setTimeout(() => controller.abort(), 2500);
             const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timer);
             if (res.ok) {
@@ -1070,15 +1171,97 @@
 
         if (!weatherData) {
           try {
-            const openMeteoUrl = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=America/Mexico_City";
+            const openMeteoUrl = "https://api.open-meteo.com/v1/forecast?latitude=18.6575&longitude=-91.8325&current=precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=precipitation_probability,precipitation,temperature_2m,weather_code&daily=precipitation_probability_max,precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=America/Mexico_City&forecast_days=2";
             const res = await fetch(openMeteoUrl);
             const data = await res.json();
             const cur = data.current || {};
             const precip = typeof cur.precipitation === "number" ? cur.precipitation : 0;
+            const daily = data.daily || {};
+            const todayStr = daily.time?.[0] || new Date().toISOString().slice(0, 10);
+            const probMax = daily.precipitation_probability_max?.[0] || 0;
+            const sumMm = daily.precipitation_sum?.[0] || 0.0;
+            const tempMax = daily.temperature_2m_max?.[0] || null;
+            const tempMin = daily.temperature_2m_min?.[0] || null;
+
+            const hourly = data.hourly || {};
+            const times = hourly.time || [];
+            const probs = hourly.precipitation_probability || [];
+            const precs = hourly.precipitation || [];
+            const temps = hourly.temperature_2m || [];
+            const codes = hourly.weather_code || [];
+
+            const todayHours = [];
+            for (let i = 0; i < times.length; i++) {
+              if (String(times[i]).startsWith(todayStr)) {
+                const hPart = String(times[i]).split("T")[1];
+                const hInt = parseInt(hPart.split(":")[0], 10);
+                const ampm = hInt < 12 ? "am" : "pm";
+                const h12 = hInt % 12 === 0 ? 12 : hInt % 12;
+                const wCode = codes[i] || 0;
+                todayHours.push({
+                  time: times[i],
+                  hour: `${String(hInt).padStart(2, "0")}:00`,
+                  label: `${h12}:00 ${ampm}`,
+                  probability: probs[i] || 0,
+                  precipitation_mm: precs[i] || 0.0,
+                  temperature_c: temps[i] || null,
+                  weather_code: wCode,
+                  weather_desc: WMO_DESCS[wCode] || "Variable"
+                });
+              }
+            }
+
+            const peakHours = [];
+            if (todayHours.length) {
+              const afternoonSlots = todayHours.filter(h => {
+                const hourNum = parseInt(h.hour.slice(0, 2), 10);
+                return hourNum >= 12 && hourNum <= 18;
+              });
+              const topAfternoon = afternoonSlots.length
+                ? [...afternoonSlots].sort((a, b) => (b.probability - a.probability) || (b.precipitation_mm - a.precipitation_mm))[0]
+                : null;
+              const topStorm = [...todayHours].sort((a, b) => (b.precipitation_mm - a.precipitation_mm) || (b.probability - a.probability))[0];
+
+              if (topAfternoon && topAfternoon.probability >= 30) {
+                peakHours.push({
+                  type: "tarde",
+                  label: topAfternoon.label,
+                  hour: topAfternoon.hour,
+                  probability: topAfternoon.probability,
+                  precipitation_mm: topAfternoon.precipitation_mm,
+                  desc: topAfternoon.weather_desc,
+                  zone_tag: "Playa Norte y Malecón"
+                });
+              }
+
+              if (topStorm && (!topAfternoon || topStorm.hour !== topAfternoon.hour) && topStorm.precipitation_mm > 0) {
+                peakHours.push({
+                  type: "tormenta",
+                  label: topStorm.label,
+                  hour: topStorm.hour,
+                  probability: topStorm.probability,
+                  precipitation_mm: topStorm.precipitation_mm,
+                  desc: topStorm.weather_desc,
+                  zone_tag: "Col. Centro y Zonas Bajas"
+                });
+              }
+            }
+
+            let alertMsg = "Condiciones monitoreadas en tiempo real.";
+            if (todayHours.some(h => [95, 96, 99].includes(h.weather_code))) {
+              const sH = todayHours.find(h => [95, 96, 99].includes(h.weather_code));
+              alertMsg = `Alerta meteorológica: Posibilidad de tormenta eléctrica hacia las ${sH.label} con ${sH.precipitation_mm} mm de precipitación.`;
+            } else if (sumMm >= 10) {
+              alertMsg = `Aviso de lluvia acumulada: Se pronostican hasta ${sumMm} mm durante el día de hoy.`;
+            } else if (probMax >= 60) {
+              alertMsg = `Alta probabilidad de precipitaciones hoy (hasta ${probMax}%).`;
+            }
+
             const computedZones = DEFAULT_ZONES.map(z => {
-              const r = computeRiskLevel(z.base_risk, precip);
+              const r = computeRiskLevel(z.base_risk, precip, sumMm);
               return { name: z.name, latitude: z.latitude, longitude: z.longitude, level: r.level, color: r.color };
             });
+
             weatherData = {
               weather: {
                 precipitation_mm: precip,
@@ -1087,22 +1270,38 @@
                 wind_speed_kmh: cur.wind_speed_10m,
                 observed_at: cur.time
               },
+              forecast_today: {
+                date: todayStr,
+                date_formatted: "Hoy, " + new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short" }),
+                precipitation_probability_max: probMax,
+                precipitation_sum_mm: sumMm,
+                temperature_max_c: tempMax,
+                temperature_min_c: tempMin,
+                alert_message: alertMsg,
+                peak_hours: peakHours,
+                hourly: todayHours
+              },
               zones: computedZones
             };
           } catch (_) {}
         }
 
-        if (weatherData && weatherData.weather) {
-          const w = weatherData.weather;
-          document.getElementById("meteo-rain").textContent = `${w.precipitation_mm ?? 0} mm`;
-          document.getElementById("meteo-temp").textContent = `${w.temperature_c ?? '--'}°C`;
-          document.getElementById("meteo-humidity").textContent = `${w.humidity_percent ?? '--'}%`;
-          document.getElementById("meteo-wind").textContent = `${w.wind_speed_kmh ?? '--'} km/h`;
-          if (w.observed_at) {
-            document.getElementById("meteo-time").textContent = w.observed_at.replace("T", " ");
+        if (weatherData) {
+          if (weatherData.weather) {
+            const w = weatherData.weather;
+            document.getElementById("meteo-rain").textContent = `${w.precipitation_mm ?? 0} mm`;
+            document.getElementById("meteo-temp").textContent = `${w.temperature_c ?? '--'}°C`;
+            document.getElementById("meteo-humidity").textContent = `${w.humidity_percent ?? '--'}%`;
+            document.getElementById("meteo-wind").textContent = `${w.wind_speed_kmh ?? '--'} km/h`;
+            if (w.observed_at) {
+              document.getElementById("meteo-time").textContent = w.observed_at.replace("T", " ");
+            }
           }
           if (weatherData.zones) {
             updateRiskZonesUI(weatherData.zones);
+          }
+          if (weatherData.forecast_today) {
+            updateForecastTodayUI(weatherData.forecast_today);
           }
         }
       }
